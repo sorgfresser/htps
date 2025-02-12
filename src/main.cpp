@@ -1,4 +1,4 @@
-#include "graph.h"
+#include "base.h"
 #include <iostream>
 #include <string>
 
@@ -18,7 +18,8 @@ int main() {
         },
         "proof_tactic": {
             "unique_string": "e",
-            "is_valid": true
+            "is_valid": true,
+            "duration": 200
         },
         "children": [
             {
@@ -44,7 +45,8 @@ int main() {
         "tactics": [
             {
                 "unique_string": "a",
-                "is_valid": true
+                "is_valid": true,
+                "duration": 200
             }
         ],
         "tactic_to_children": {
@@ -55,7 +57,8 @@ int main() {
                     "tactics": [
                         {
                             "unique_string": "b",
-                            "is_valid": true
+                            "is_valid": true,
+                            "duration": 400
                         }
                     ],
                     "tactic_to_children": {

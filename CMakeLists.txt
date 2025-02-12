@@ -3,4 +3,4 @@ project(htps)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_executable(htps src/main.cpp src/graph.cpp src/graphcorrect.cpp)
+add_executable(htps src/main.cpp src/base.cpp src/graph.cpp)

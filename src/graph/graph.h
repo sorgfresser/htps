@@ -13,13 +13,17 @@
 #include <array>
 #include <iostream>
 #include <vector>
-#include <climits>
+#include <limits>
 #include <optional>
 #include <deque>
 #include <cassert>
 #include <queue>
+#include <memory>
 
 namespace htps {
+    constexpr size_t MAXIMUM_PROOF_LENGTH =
+            std::numeric_limits<size_t>::max() / 2; // Is still large enough, but prevents overflow
+
     enum Metric {
         DEPTH, SIZE, TIME, METRIC_COUNT
     };
@@ -46,7 +50,7 @@ namespace htps {
             std::cout << "TIME: " << minimum_length[TIME] << '\n';
         }
 
-        MinimumLengthMap() : minimum_length{INT_MAX, INT_MAX, INT_MAX} {}
+        MinimumLengthMap() : minimum_length{MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH} {}
     };
 
     class MinimumTacticMap {
@@ -67,15 +71,15 @@ namespace htps {
         // Print all tactics
         void print() const {
             std::cout << "DEPTH tactics: ";
-            for (int t: minimum_tactics[DEPTH]) std::cout << t << ' ';
+            for (size_t t: minimum_tactics[DEPTH]) std::cout << t << ' ';
             std::cout << '\n';
 
             std::cout << "SIZE tactics: ";
-            for (int t: minimum_tactics[SIZE]) std::cout << t << ' ';
+            for (size_t t: minimum_tactics[SIZE]) std::cout << t << ' ';
             std::cout << '\n';
 
             std::cout << "TIME tactics: ";
-            for (int t: minimum_tactics[TIME]) std::cout << t << ' ';
+            for (size_t t: minimum_tactics[TIME]) std::cout << t << ' ';
             std::cout << '\n';
         }
 
@@ -90,7 +94,7 @@ namespace htps {
     public:
         void set_tactic(Metric metric, size_t value, size_t tactic_id) {
             if (tactic_id >= minimum_tactic_length[metric].size()) {
-                minimum_tactic_length[metric].resize(tactic_id + 1, INT_MAX);
+                minimum_tactic_length[metric].resize(tactic_id + 1, MAXIMUM_PROOF_LENGTH);
             }
             minimum_tactic_length[metric][tactic_id] = value;
         }
@@ -98,14 +102,14 @@ namespace htps {
         // Get value for a specific metric
         size_t get(Metric metric, size_t tactic_id) const {
             if (tactic_id >= minimum_tactic_length[metric].size()) {
-                return INT_MAX;
+                return MAXIMUM_PROOF_LENGTH;
             }
             return minimum_tactic_length[metric][tactic_id];
         }
 
         bool has_value(Metric metric, size_t tactic_id) const {
             return tactic_id < minimum_tactic_length[metric].size() &&
-                   minimum_tactic_length[metric][tactic_id] != INT_MAX;
+                   minimum_tactic_length[metric][tactic_id] != MAXIMUM_PROOF_LENGTH;
         }
 
         // Print all values
@@ -150,10 +154,10 @@ namespace htps {
 
 
     protected:
-        theorem thm;
-        std::vector<tactic> tactics;
+        std::shared_ptr<theorem> thm;
+        std::vector<std::shared_ptr<tactic>> tactics;
         std::vector<bool> tactic_expandable;
-        std::vector<std::vector<theorem>> children_for_tactic;
+        std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
         std::unordered_set<size_t> killed_tactics;
         std::unordered_set<size_t> solving_tactics;
         MinimumLengthMap minimum_proof_size;
@@ -177,7 +181,8 @@ namespace htps {
             return solved;
         }
 
-        Node(theorem thm, std::vector<tactic> tactics, std::vector<std::vector<theorem>> children_for_tactic) :
+        Node(std::shared_ptr<theorem> &thm, std::vector<std::shared_ptr<tactic>> &tactics,
+             std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic) :
                 thm(thm),
                 tactics(tactics),
                 tactic_expandable(tactics.size(), true),
@@ -193,14 +198,14 @@ namespace htps {
                 in_proof(false) {
             std::vector<bool> is_solved(tactics.size(), false);
             for (size_t i = 0; i < tactics.size(); i++) {
-                if (children_for_tactic[i].empty() && tactics[i].is_valid) {
+                if (children_for_tactic[i].empty() && tactics[i]->is_valid) {
                     is_solved[i] = true;
                 }
             }
             const bool all_solved = std::all_of(is_solved.begin(), is_solved.end(), [](bool b) { return b; });
             const bool none_solved = std::none_of(is_solved.begin(), is_solved.end(), [](bool b) { return b; });
 
-            if (!(all_solved || none_solved || this->n_tactics() == 0)) {
+            if (!(all_solved || none_solved || n_tactics() == 0)) {
                 throw std::invalid_argument("Invalid tactics");
             }
 
@@ -213,7 +218,7 @@ namespace htps {
             }
             // Kill fake tactics
             for (size_t i = 0; i < tactics.size(); i++) {
-                if (!tactics[i].is_valid) {
+                if (!tactics[i]->is_valid) {
                     kill_tactic(i);
                 }
             }
@@ -259,18 +264,18 @@ namespace htps {
             return is_solved_leaf;
         }
 
-        theorem get_theorem() const {
+        std::shared_ptr<theorem> get_theorem() const {
             return thm;
         }
 
-        std::vector<theorem> get_children_for_tactic(size_t i) const {
+        std::vector<std::shared_ptr<theorem>> get_children_for_tactic(size_t i) const {
             if (i >= children_for_tactic.size()) {
                 throw std::invalid_argument("Invalid tactic");
             }
             return children_for_tactic[i];
         }
 
-        std::vector<std::vector<theorem>> get_children_for_tactic() const {
+        std::vector<std::vector<std::shared_ptr<theorem>>> get_children_for_tactic() const {
             return children_for_tactic;
         }
 
@@ -293,7 +298,7 @@ namespace htps {
         }
 
         bool is_valid(size_t i) const {
-            return tactics[i].is_valid;
+            return tactics[i]->is_valid;
         }
 
         // Returns true if this was the first tactic to solve the theorem
@@ -308,7 +313,7 @@ namespace htps {
             in_proof = true;
         }
 
-        bool is_in_proof() {
+        bool is_in_proof() const {
             return in_proof;
         }
 
@@ -334,7 +339,7 @@ namespace htps {
             return minimum_proof_size.get(metric);
         }
 
-        tactic get_tactic(size_t tactic_id) const {
+        std::shared_ptr<tactic> get_tactic(size_t tactic_id) const {
             return tactics[tactic_id];
         }
 
@@ -343,7 +348,7 @@ namespace htps {
         }
 
         bool has_minimum_length(Metric metric) const {
-            return minimum_proof_size.get(metric) != INT_MAX;
+            return minimum_proof_size.get(metric) != MAXIMUM_PROOF_LENGTH;
         }
 
         void set_minimum_tactic(Metric metric, size_t tactic_id) {
@@ -377,7 +382,7 @@ namespace htps {
      * */
     class PrioritizedNode {
     public:
-        Node *node;
+        std::shared_ptr<Node> node;
         size_t priority;
         size_t tactic_id;
 
@@ -389,28 +394,118 @@ namespace htps {
         }
     };
 
-    class AncestorsMap {
-
+    // Map a theorem to type T
+    template<typename T>
+    class TheoremMap {
     protected:
-        using AncestorSet = std::unordered_set<std::pair<std::optional<struct theorem>, size_t>>;
-        std::unordered_map<theorem, AncestorSet> ancestors;
+        std::unordered_map<std::string, T> _map;
     public:
+        auto begin() const noexcept {
+            return _map.begin();
+        }
+
+        auto end() const noexcept {
+            return _map.end();
+        }
+
+        bool contains(const std::string &s) const {
+            return _map.contains(s);
+        }
+
+        bool contains(const theorem &thm) const {
+            return contains(thm.unique_string);
+        }
+
+        bool contains(const std::shared_ptr<theorem> &thm) const {
+            return contains(*thm);
+        }
+
+        T &at(const std::string &s) {
+            return _map.at(s);
+        }
+
+        T &at(const theorem &thm) {
+            return at(thm.unique_string);
+        }
+
+        T &at(const std::shared_ptr<theorem> &thm) {
+            return at(*thm);
+        }
+
+        void insert(const std::string &s, const T &t) {
+            _map.insert({s, t});
+        }
+
+        void insert(const theorem &thm, const T &t) {
+            insert(thm.unique_string, t);
+        }
+
+        void insert(const std::shared_ptr<theorem> &thm, const T &t) {
+            insert(*thm, t);
+        }
+
+        bool erase(const std::string &s) {
+            return _map.erase(s) > 0;
+        }
+
+        bool erase(const theorem &thm) {
+            return erase(thm.unique_string);
+        }
+
+        bool erase(const std::shared_ptr<theorem> &thm) {
+            return erase(*thm);
+        }
+
+        size_t size() const {
+            return _map.size();
+        }
+
+        auto find(const std::string &s) const {
+            return _map.find(s);
+        }
+
+        auto find(const theorem &thm) const {
+            return find(thm.unique_string);
+        }
+
+        auto find(const std::shared_ptr<theorem> &thm) const {
+            return find(*thm);
+        }
+    };
+
+
+    using AncestorSet = std::unordered_set<std::pair<std::shared_ptr<struct theorem>, size_t>>;
+
+    class AncestorsMap : public TheoremMap<AncestorSet> {
+    public:
+        using TheoremMap<AncestorSet>::contains;
+        using TheoremMap<AncestorSet>::at;
+        using TheoremMap<AncestorSet>::insert;
+        using TheoremMap<AncestorSet>::erase;
+        using TheoremMap<AncestorSet>::find;
+        using TheoremMap<AncestorSet>::size;
+
         // Add an ancestor relationship
-        void add_ancestor(const theorem &theorem, const std::optional<struct theorem> &parent, size_t tactic_id) {
-            ancestors[theorem].insert(std::make_tuple(parent, tactic_id));
+        void
+        add_ancestor(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+            at(thm).insert(std::make_pair(parent, tactic_id));
         }
 
         // Get ancestors for a theorem
-        const AncestorSet &get_ancestors(const theorem &theorem) const {
+        const AncestorSet &get_ancestors(const theorem &thm) const {
             static const AncestorSet empty_set;
-            auto it = ancestors.find(theorem);
-            return it != ancestors.end() ? it->second : empty_set;
+            auto it = find(thm);
+            return it != end() ? it->second : empty_set;
+        }
+
+        const AncestorSet &get_ancestors(const std::shared_ptr<theorem> &thm) const {
+            return get_ancestors(*thm);
         }
 
         // Print ancestors
         void print() const {
-            for (const auto &[theorem, ancestor_set]: ancestors) {
-                std::cout << "Theorem string: " << theorem.unique_string << '\n';
+            for (const auto &[thm, ancestor_set]: _map) {
+                std::cout << "Theorem string: " << thm << '\n';
                 for (const auto &[parent, tactic_id]: ancestor_set) {
                     if (parent) {
                         std::cout << "(Parent: " << parent->unique_string << ", Tactic ID: " << tactic_id << ") ";
@@ -422,42 +517,26 @@ namespace htps {
             }
         }
 
-        auto begin() noexcept {
-            return ancestors.begin();
-        }
-
-        auto end() noexcept {
-            return ancestors.end();
-        }
-
-        bool contains(theorem thm) {
-            return ancestors.contains(thm);
-        }
-
-        bool contains(theorem thm, std::optional<theorem> parent, size_t tactic_id) {
-            if (!ancestors.contains(thm)) {
+        bool contains(const theorem &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+            if (!contains(thm)) {
                 return false;
             }
-            return ancestors.at(thm).contains({parent, tactic_id});
+            return get_ancestors(thm).contains({parent, tactic_id});
         }
 
-        bool size() {
-            return ancestors.size();
+        size_t size(const theorem &thm) const {
+            return get_ancestors(thm).size();
         }
 
-        bool size(theorem thm) {
-            return ancestors.at(thm).size();
-        }
-
-        bool erase(theorem thm) {
-            return ancestors.erase(thm) > 0;
-        }
-
-        bool erase(theorem thm, std::optional<theorem> parent, size_t tactic_id) {
-            if (!ancestors.contains(thm)) {
+        bool erase(const theorem &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+            if (!contains(thm)) {
                 return false;
             }
-            return ancestors.at(thm).erase({parent, tactic_id}) > 0;
+            return at(thm).erase({parent, tactic_id}) > 0;
+        }
+
+        bool erase(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+            return erase(*thm, parent, tactic_id);
         }
     };
 
@@ -465,8 +544,8 @@ namespace htps {
     template<typename T, typename PT>
     class Graph {
     protected:
-        theorem root;
-        std::unordered_map<theorem, T> nodes;
+        std::shared_ptr<theorem> root;
+        TheoremMap<T> nodes;
         AncestorsMap ancestors;
         AncestorsMap permanent_ancestors;
         std::unordered_set<theorem> unexplored_theorems;
@@ -474,11 +553,12 @@ namespace htps {
         MinimumLengthMap initial_minimum_proof_size;
 
     public:
-        Graph(theorem &root) : root(root), nodes(), ancestors(), permanent_ancestors(), unexplored_theorems(),
-                               minimum_proof_size(), initial_minimum_proof_size() {
-            ancestors.add_ancestor(root, std::nullopt, 0);
-            permanent_ancestors.add_ancestor(root, std::nullopt, 0);
-            unexplored_theorems.insert(root);
+        Graph(std::shared_ptr<theorem> &root) : root(root), nodes(), ancestors(), permanent_ancestors(),
+                                                unexplored_theorems(),
+                                                minimum_proof_size(), initial_minimum_proof_size() {
+            ancestors.add_ancestor(root, nullptr, 0);
+            permanent_ancestors.add_ancestor(root, nullptr, 0);
+            unexplored_theorems.insert(*root);
         }
 
         void reset_minimum_proof_stats() {
@@ -500,7 +580,7 @@ namespace htps {
             std::vector<T> to_check_solved;
             std::vector<T> newly_solved;
             for (const auto &node: node_list) {
-                theorem th = node.get_theorem();
+                std::shared_ptr<theorem> th = node.get_theorem();
                 if (!ancestors.contains(th) || permanent_ancestors.contains(th)) {
                     throw std::invalid_argument("Invalid node");
                 }
@@ -511,7 +591,7 @@ namespace htps {
                 if (node.is_bad()) {
                     for (const auto &[parent_th, tactic_id]: ancestors.get_ancestors(th)) {
                         if (parent_th) {
-                            nodes.at(parent_th.value()).kill_tactic(tactic_id);
+                            nodes.at(parent_th).kill_tactic(tactic_id);
                         }
                     }
                     continue;
@@ -539,7 +619,7 @@ namespace htps {
 
         void kill_tactic(T node, size_t tactic_id) {
             std::deque<std::pair<T, size_t>> to_kill;
-            theorem thm;
+            std::shared_ptr<theorem> thm;
             to_kill.push_back({node, tactic_id});
             while (!to_kill.empty()) {
                 auto [current, tid] = to_kill.front();
@@ -564,7 +644,7 @@ namespace htps {
                 if (current.kill_tactic(tid)) {
                     for (const auto &[parent, parent_tid]: ancestors.get_ancestors(thm)) {
                         if (parent) {
-                            to_kill.push_front({nodes.at(parent.value()), parent_tid});
+                            to_kill.push_front({nodes.at(parent), parent_tid});
                         }
                     }
                 }
@@ -575,7 +655,7 @@ namespace htps {
         void find_unexplored() {
             unexplored_theorems.clear();
             if (!nodes.contains(root)) {
-                unexplored_theorems.insert(root);
+                unexplored_theorems.insert(*root);
                 return;
             }
             std::deque<T> to_explore;
@@ -614,39 +694,39 @@ namespace htps {
             for (const auto &[thm, node]: nodes) {
                 node.set_expandable(false);
             }
-            std::vector<theorem> to_propagate;
+            std::vector<std::shared_ptr<theorem>> to_propagate;
             for (const auto &thm: unexplored_theorems) {
                 for (const auto &[parent, tactic_id]: ancestors.get_ancestors(thm)) {
                     if (!parent) {
                         continue;
                     }
-                    T &node = nodes.at(parent.value());
+                    T &node = nodes.at(parent);
                     if (node.killed(tactic_id)) {
                         continue;
                     }
                     node.set_expandable(tactic_id, true);
-                    to_propagate.push_back(parent.value());
+                    to_propagate.push_back(parent);
                 }
             }
-            std::deque<theorem> propagate_queue(to_propagate.begin(), to_propagate.end());
+            std::deque<std::shared_ptr<theorem>> propagate_queue(to_propagate.begin(), to_propagate.end());
             std::unordered_set<theorem> seen;
             while (!propagate_queue.empty()) {
-                theorem current = propagate_queue.front();
+                std::shared_ptr<theorem> current = propagate_queue.front();
                 propagate_queue.pop_front();
-                if (seen.contains(current)) {
+                if (seen.contains(*current)) {
                     continue;
                 }
-                seen.insert(current);
+                seen.insert(*current);
                 for (const auto &[parent, tactic_id]: ancestors.get_ancestors(current)) {
                     if (!parent) {
                         continue;
                     }
-                    T &node = nodes.at(parent.value());
+                    T &node = nodes.at(parent);
                     if (node.killed(tactic_id)) {
                         continue;
                     }
                     node.set_expandable(tactic_id, true);
-                    propagate_queue.push_front(parent.value());
+                    propagate_queue.push_front(parent);
                 }
             }
         }
@@ -665,7 +745,7 @@ namespace htps {
             find_unexplored();
             propagate_expandable();
             // If just starting
-            if (unexplored_theorems.size() == 1 and unexplored_theorems.contains(root)) {
+            if (unexplored_theorems.size() == 1 && unexplored_theorems.contains(*root)) {
                 expandable_check();
                 return;
             }
@@ -766,17 +846,17 @@ namespace htps {
                 return;
             }
             std::unordered_set<theorem> seen;
-            std::deque<theorem> to_visit;
+            std::deque<std::shared_ptr<theorem>> to_visit;
             while (!to_visit.empty()) {
-                theorem current = to_visit.front();
+                std::shared_ptr<theorem> current = to_visit.front();
                 to_visit.pop_front();
                 if (!nodes.contains(current)) {
                     continue;
                 }
-                if (seen.contains(current)) {
+                if (seen.contains(*current)) {
                     continue;
                 }
-                seen.insert(current);
+                seen.insert(*current);
                 T &node = nodes.at(current);
                 assert (node.n_solving_tactics() > 0);
                 node.set_in_proof();
@@ -787,7 +867,7 @@ namespace htps {
         }
 
         // Get all proofs for a theorem
-        std::vector<struct proof> all_proofs(theorem thm) {
+        std::vector<struct proof> all_proofs(std::shared_ptr<theorem> &thm) {
             T node = nodes.at(thm);
             if (!node.is_solved()) {
                 throw std::invalid_argument("Theorem not solved");
@@ -831,7 +911,7 @@ namespace htps {
                 to_process.clear();
                 // For each solved leaf, create priority nodes for each tactic that solves the leaf
                 for (const auto &[thm, node]: nodes) {
-                    if (!node.is_solved_leaf()) {
+                    if (!node.is_solved_leaf_node()) {
                         continue;
                     }
                     for (const auto &tactic_id: node.solving_range()) {
@@ -884,7 +964,7 @@ namespace htps {
                             default:
                                 throw std::invalid_argument("Invalid metric");
                         }
-                        if (new_priority < INT_MAX) {
+                        if (new_priority < MAXIMUM_PROOF_LENGTH) {
                             pq.push({&parent_node, new_priority, parent_tactic});
                         }
                     }
@@ -895,18 +975,18 @@ namespace htps {
                     return;
 
                 assert(nodes.contains(root));
-                assert(nodes.at(root).minimum_length(metric) < INT_MAX);
+                assert(nodes.at(root).minimum_length(metric) < MAXIMUM_PROOF_LENGTH);
                 minimum_proof_size.set(metric, nodes.at(root).minimum_length(metric));
-                std::deque<theorem> to_visit;
+                std::deque<std::shared_ptr<theorem>> to_visit;
                 to_visit.push_back(root);
                 std::unordered_set<theorem> seen;
                 while (!to_visit.empty()) {
-                    theorem current = to_visit.front();
+                    std::shared_ptr<theorem> current = to_visit.front();
                     to_visit.pop_front();
-                    if (seen.contains(current)) {
+                    if (seen.contains(*current)) {
                         continue;
                     }
-                    seen.insert(current);
+                    seen.insert(*current);
                     T &node = nodes.at(current);
                     node.set_in_minimum_proof(metric, true);
                     assert(node.is_in_proof());
@@ -927,7 +1007,7 @@ namespace htps {
             size_t base = 0;
             for (const auto &child: children) {
                 if (!nodes.contains(child)) {
-                    return INT_MAX;
+                    return MAXIMUM_PROOF_LENGTH;
                 }
                 const T &node = nodes.at(child);
                 base = max(base, node.minimum_length(DEPTH));
@@ -939,7 +1019,7 @@ namespace htps {
             size_t base = 0;
             for (const auto &child: children) {
                 if (!nodes.contains(child)) {
-                    return INT_MAX;
+                    return MAXIMUM_PROOF_LENGTH;
                 }
                 const T &node = nodes.at(child);
                 base += node.minimum_length(SIZE);
@@ -951,7 +1031,7 @@ namespace htps {
             size_t base = 0;
             for (const auto &child: children) {
                 if (!nodes.contains(child)) {
-                    return INT_MAX;
+                    return MAXIMUM_PROOF_LENGTH;
                 }
                 const T &node = nodes.at(child);
                 base += node.minimum_length(TIME);

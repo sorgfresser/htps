@@ -3,7 +3,7 @@ project(htps)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_executable(htps src/main.cpp src/base.cpp src/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp)
+add_executable(htps src/main.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp)
 
 add_executable(tokenizer src/tokenization/create_tokenizer.cpp src/tokenization/tokenization_utils.cpp)
 

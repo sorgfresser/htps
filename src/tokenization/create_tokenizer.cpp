@@ -2,6 +2,8 @@
 #include "tokenization_utils.h"
 #include <iostream>
 
+using namespace htps;
+
 int main(int argc, char* argv[]) {
     // Attempt to set up our tokenizer.
     if (argc < 3) {

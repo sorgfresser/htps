@@ -5,7 +5,7 @@
 
 using namespace onmt;
 
-onmt::Tokenizer get_tokenizer_from_env() {
+onmt::Tokenizer htps::get_tokenizer_from_env() {
     const char *tokenizer_path = std::getenv("TOKENIZER_PATH");
     if (!tokenizer_path || std::string(tokenizer_path).empty()) {
         throw std::runtime_error("TOKENIZER_PATH not set");
@@ -13,5 +13,5 @@ onmt::Tokenizer get_tokenizer_from_env() {
     return tokenizer_from_model_file(tokenizer_path);
 }
 
-// We'll create a global_tokenizer but initialize it in main with fallback logic.
-onmt::Tokenizer global_tokenizer = get_tokenizer_from_env();
+// We'll create a global_tokenizer using the TOKENIZER_PATH env var
+onmt::Tokenizer htps::global_tokenizer = htps::get_tokenizer_from_env();

@@ -6,13 +6,22 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include "../model/specialtokens.h"
+
 
 using namespace onmt;
+using namespace htps;
 
-BPELearner learn_from_lean_files(const std::filesystem::path &path, const std::filesystem::path &model_path) {
-    BPELearner learner = {true, 65536, 5, false, true};
+constexpr size_t N_SYMBOLS = 65536;
 
-    Tokenizer tokenizer(Tokenizer::Mode::Conservative);
+BPELearner htps::learn_from_lean_files(const std::filesystem::path &path, const std::filesystem::path &model_path) {
+    BPELearner learner = {true, N_SYMBOLS, 5, false, true};
+
+    for (const auto special_token: SPECIAL_TOKENS) {
+        learner.add_special_token(special_token);
+    }
+
     for (auto const &p: glob::glob(path.string() + "/**/*.lean")) {
         std::ifstream file(p);
         learner.ingest(file, nullptr);
@@ -24,10 +33,12 @@ BPELearner learn_from_lean_files(const std::filesystem::path &path, const std::f
     return learner;
 }
 
-BPE bpe_from_model_file(const std::filesystem::path &path) {
-    return {path.string()};
+BPE htps::bpe_from_model_file(const std::filesystem::path &path) {
+    BPE bpe = {path.string()};
+    return bpe;
 }
 
-Tokenizer tokenizer_from_model_file(const std::filesystem::path &path) {
-    return {Tokenizer::Mode::Conservative, 0, path.string()};
+Tokenizer htps::tokenizer_from_model_file(const std::filesystem::path &path) {
+    BPE *bpe = new BPE(bpe_from_model_file(path));
+    return {Tokenizer::Mode::Space, bpe, Tokenizer::Flags::NoSubstitution};
 }

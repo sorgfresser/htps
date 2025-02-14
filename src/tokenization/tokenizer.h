@@ -8,9 +8,10 @@
 #include <onmt/Tokenizer.h>
 #include <filesystem>
 
+namespace htps {
+    extern onmt::Tokenizer global_tokenizer;
 
-extern onmt::Tokenizer global_tokenizer;
-
-onmt::Tokenizer get_tokenizer_from_env();
+    onmt::Tokenizer get_tokenizer_from_env();
+}
 
 #endif //HTPS_TOKENIZER_H

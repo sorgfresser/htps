@@ -4,7 +4,6 @@
 
 #include "policy.h"
 #include <vector>
-#include <limits>
 #include <stdexcept>
 #include <array>
 #include <numeric>
@@ -14,7 +13,6 @@
 
 using namespace htps;
 
-constexpr double MIN_FLOAT = std::numeric_limits<double>::min() / 2; // Avoid underflow
 constexpr size_t MAX_DEPTH = 50;
 constexpr double TOLERANCE = 1e-3;
 constexpr double EPSILON = 1e-10;

@@ -12,6 +12,9 @@ Once such a tactic is added to the graph, we try and propagate the solved state 
 ## Usage
 The Graph class stores a lot of the main logic. The MCTS implementation adds a critic on top of this.
 
+### Seeding
+Set env var `SEED` to a number to seed the random number generator.
+
 ## Classes and Structures
 
 ### `tactic`

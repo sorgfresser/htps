@@ -371,7 +371,7 @@ namespace htps {
             in_minimum_proof.set(metric, value);
         }
 
-        bool get_in_minimum_proof(Metric metric) {
+        bool is_in_minimum_proof(Metric metric) {
             return in_minimum_proof.get(metric);
         }
 

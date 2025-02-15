@@ -7,8 +7,10 @@
 
 #include <vector>
 #include <cassert>
+#include <limits>
 
 namespace htps {
+    constexpr double MIN_FLOAT = std::numeric_limits<double>::min() / 2; // Avoid underflow
     enum PolicyType {
         AlphaZero, RPO, PolicyTypeCount
     };

@@ -87,3 +87,7 @@ Represents a Lean theorem, extending the base `theorem` class.
 
 - **Methods:**
     - `std::vector<std::string> tokenize() const override`: Tokenizes the theorem.
+
+
+## Design decisions
+I left out use_count_threshold_for_solved for now

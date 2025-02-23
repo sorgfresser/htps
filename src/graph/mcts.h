@@ -133,10 +133,14 @@ namespace htps {
     struct mcts_params {
         double exploration;
         PolicyType policy_type;
-        size_t num_expansions;
-        size_t succ_expansions; //no idea?
+        size_t num_expansions; // maximal number of expansions until the MCTS is considered done
+        size_t succ_expansions; // number of expansions in a batch
         bool early_stopping;
         bool no_critic;
+        bool backup_once; // Backup
+        // Simulations only once, keeping track of a hash of the Simulation
+        bool backup_one_for_solved; // Backup value of 1.0 for solved nodes. If false, will use critic value nonetheless
+        double depth_penalty; // Penalty for depth, i.e. the discount factor
         size_t count_threshold;
         bool tactic_p_threshold;
         bool tactic_sample_q_conditioning;
@@ -161,12 +165,15 @@ namespace htps {
         TheoremMap<std::shared_ptr<tactic>> tactics;
         TheoremMap<size_t> depth;
         TheoremMap<std::vector<std::shared_ptr<theorem>>> children_for_theorem;
+        TheoremMap<std::shared_ptr<theorem>> parent_for_theorem;
         TheoremMap<double> values;
         TheoremMap<bool> solved;
+        TheoremMap<bool> virtual_count_added;
         TheoremMap<TheoremSet> seen; // Seen theorems, we immediately free the memory since this can get large
         std::shared_ptr<theorem> root;
-        size_t expansions;
+        size_t expansions; // Number of expansions currently awaiting. If it reaches 0, values should be backed up
 
+        friend struct std::hash<Simulation>;
     public:
         std::vector<std::shared_ptr<theorem>> leaves() const;
 
@@ -180,9 +187,10 @@ namespace htps {
 
         explicit Simulation(std::shared_ptr<theorem> &root)
                 : theorems(), tactics(), depth(), children_for_theorem(), values(), tactic_ids(),
-                  root(root), expansions(0) {
+                  root(root), expansions(0), virtual_count_added(), parent_for_theorem() {
             theorems.insert(root, root);
             depth.insert(root, 0);
+            parent_for_theorem.insert(root, nullptr);
         }
 
         void set_depth(const std::shared_ptr<theorem> &thm, size_t d);
@@ -217,17 +225,72 @@ namespace htps {
 
         bool erase_theorem_set(const std::shared_ptr<theorem> &thm);
 
-    };
+        void receive_expansion(const std::shared_ptr<theorem> &thm, double value, bool solved);
 
+        auto begin() const {
+            return theorems.begin();
+        }
+
+        auto end() const {
+            return theorems.end();
+        }
+
+        std::vector<std::shared_ptr<theorem>> get_children(const std::shared_ptr<theorem> &thm) const;
+
+        bool get_virtual_count_added(const std::shared_ptr<theorem> &thm) const;
+
+        void set_virtual_count_added(const std::shared_ptr<theorem> &thm, bool value);
+
+        bool should_backup() const;
+
+        std::shared_ptr<theorem> parent(const std::shared_ptr<theorem> &thm) const;
+
+        std::vector<double> child_values(const std::shared_ptr<theorem> &thm) const;
+
+        void reset_expansions();
+
+        void increment_expansions();
+    };
+}
+
+/* A Simulation is considered equal if it faces all the same theorems in the same order, while using the same tactics.
+ * Therefore, we hash the theorems and their tactics to get a unique hash for the simulation.
+ * */
+template<>
+struct std::hash<htps::Simulation> {
+    std::size_t operator()(const htps::Simulation &sim) const {
+        std::vector<uint32_t> hashes;
+        hashes.reserve(2 * sim.theorems.size());
+        for (const auto &[unique_str, thm]: sim) {
+            hashes.push_back(std::hash<htps::theorem>{}(*thm));
+            hashes.push_back(std::hash<htps::tactic>{}(*sim.get_tactic(thm)));
+        }
+        return hash_vector(hashes);
+    }
+
+    static std::size_t hash_vector(std::vector<uint32_t> const &vec) {
+        std::size_t seed = vec.size();
+        for (auto x: vec) {
+            x = ((x >> 16) ^ x) * 0x45d9f3b;
+            x = ((x >> 16) ^ x) * 0x45d9f3b;
+            x = (x >> 16) ^ x;
+            seed ^= x + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+    }
+};
+
+
+namespace htps {
     class MCTSNode : public Node {
     private:
-        double old_critic_value;
-        double log_critic_value;
+        double old_critic_value{};
+        double log_critic_value{};
         std::vector<double> priors;
         QValueSolved q_value_solved;
-        std::vector<std::pair<std::shared_ptr<tactic>, std::vector<std::shared_ptr<theorem>>>> effects;
+        std::vector<std::shared_ptr<env_effect>> effects;
         std::shared_ptr<Policy> policy;
-        double exploration;
+        double exploration{};
         double tactic_init_value = 0.0;
         std::vector<double> log_w; // Total action value
         std::vector<size_t> counts; // Total action count
@@ -245,31 +308,41 @@ namespace htps {
                                    std::vector<std::shared_ptr<tactic>> &valid_tactics,
                                    std::vector<double> &valid_priors, std::vector<double> &valid_targets) const;
 
+        bool _validate() const;
+
     public:
-        MCTSNode(std::shared_ptr<theorem> &thm, std::vector<std::shared_ptr<tactic>> &tactics,
-                 std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic,
-                 const std::shared_ptr<Policy> &policy, std::vector<double> &priors,
-                 double exploration, double log_critic_value, QValueSolved q_value_solved, double tactic_init_value,
-                 std::vector<std::pair<std::shared_ptr<tactic>, std::vector<std::shared_ptr<theorem>>>> &effects,
-                 size_t seed = 42) :
+        MCTSNode(const std::shared_ptr<theorem> &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
+                 const std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic,
+                 const std::shared_ptr<Policy> &policy, const std::vector<double> &priors,
+                 const double exploration, const double log_critic_value, const QValueSolved q_value_solved,
+                 const double tactic_init_value,
+                 const std::vector<std::shared_ptr<env_effect>> &effects,
+                 const size_t seed = 42) :
                 Node(thm, tactics, children_for_tactic), old_critic_value(0.0), log_critic_value(log_critic_value),
                 priors(priors), q_value_solved(q_value_solved), policy(policy), exploration(exploration),
                 tactic_init_value(tactic_init_value), effects(effects), reset_mask(tactics.size()),
                 log_w(tactics.size()) {
-            assert(policy);
-            assert(q_value_solved != QValueSolvedCount);
-            assert(!tactics.empty());
-            assert(children_for_tactic.size() == tactics.size());
-            assert(children_for_tactic.size() == priors.size());
-            assert(log_critic_value <= 0);
-            // Assert is probability
-            double sum = std::accumulate(priors.begin(), priors.end(), 0.0);
-            assert(sum > 0.99 && sum < 1.01);
-            // Assert we have at least one valid tactic
-            bool is_valid = std::any_of(tactics.begin(), tactics.end(), [](const auto &t) { return t->is_valid; });
-            assert(is_valid);
+            assert(_validate());
             reset_mcts_stats();
         }
+
+        MCTSNode(const MCTSNode &node)
+                : Node(node),
+                  old_critic_value(node.old_critic_value),
+                  log_critic_value(node.log_critic_value),
+                  priors(node.priors),
+                  q_value_solved(node.q_value_solved),
+                  policy(node.policy),
+                  exploration(node.exploration),
+                  tactic_init_value(node.tactic_init_value),
+                  effects(node.effects),
+                  reset_mask(node.reset_mask),
+                  log_w(node.log_w) {
+            assert(_validate());
+            reset_mcts_stats();
+        }
+
+        MCTSNode() = default;
 
         /* Reset the MCTS statistics, resetting counts and logW values.
          * */
@@ -300,6 +373,12 @@ namespace htps {
         double get_value() const;
 
         void add_virtual_count(size_t tactic_id, size_t count);
+
+        void subtract_virtual_count(size_t tactic_id, size_t count);
+
+        bool has_virtual_count(size_t tactic_id) const;
+
+        bool has_virtual_count() const;
     };
 }
 
@@ -331,29 +410,21 @@ namespace htps {
         std::shared_ptr<Policy> policy;
         mcts_params params;
         size_t expansion_count;
-        std::vector<Simulation> simulations; // Currently ongoing simulations. Once a simulation is at 0 awaiting expansions, it is removed
+        std::vector<std::shared_ptr<Simulation>> simulations; // Currently ongoing simulations. Once a simulation is at 0 awaiting expansions, it is removed
         TheoremMap<std::vector<std::shared_ptr<Simulation>>> simulations_for_theorem; // The Simulations that need to be adjusted if we receive an expanded theorem
         std::vector<MCTSSampleEffect> train_samples_effects;
         std::vector<MCTSSampleCritic> train_samples_critic;
         std::vector<MCTSSampleTactics> train_samples_tactics;
+        std::unordered_set<size_t> backedup_hashes;
+        TheoremSet currently_expanding; // Theorems that are currently being expanded
         bool propagate_needed; // Whether propagation is required. Is set to true whenever find_to_expand fails
+        bool done;
+
+        void _single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
+                               std::vector<std::shared_ptr<theorem>> &leaves_to_expand);
 
     protected:
         bool is_leaf(const MCTSNode &node) const;
-
-    public:
-        void get_train_samples(std::vector<MCTSSampleEffect> &samples_effects,
-                               std::vector<MCTSSampleCritic> &samples_critic,
-                               std::vector<MCTSSampleTactics> &samples_tactics);
-
-        void get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics);
-
-        void find_unexplored_and_propagate_expandable();
-
-        bool dead_root() const override;
-
-        Simulation find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
-                                         std::vector<std::shared_ptr<theorem>> &to_expand);
 
         /* Upon receiving an expansion which we add to the graph, we need to update the MCTS statistics.
          * For this, the value is set in each Simulation that still has the theorem in its
@@ -365,12 +436,35 @@ namespace htps {
 
         void backup();
 
-        void backup_leaves(std::vector<std::shared_ptr<theorem>> &leaves, bool only_value);
+        void backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value);
 
-        void cleanup(Simulation to_clean);
+        std::vector<std::shared_ptr<theorem>> batch_to_expand();
+
+        void batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
+
+        void cleanup(Simulation &to_clean);
+
+    public:
+        void get_train_samples(std::vector<MCTSSampleEffect> &samples_effects,
+                               std::vector<MCTSSampleCritic> &samples_critic,
+                               std::vector<MCTSSampleTactics> &samples_tactics) const;
+
+        void get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics) const;
+
+        void find_unexplored_and_propagate_expandable();
+
+        bool dead_root() const override;
+
+        Simulation find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
+                                         std::vector<std::shared_ptr<theorem>> &to_expand);
+
+        void expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions);
 
         void mcts_move();
 
+        std::vector<std::shared_ptr<theorem>> theorems_to_expand();
+
+        void theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
     };
 
 }

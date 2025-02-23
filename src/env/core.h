@@ -36,7 +36,7 @@ namespace htps {
         env_expansion(std::shared_ptr<theorem> &thm, size_t expander_duration, size_t generation_duration,
                       std::vector<size_t> &env_durations, std::string &error) :
                 thm(thm), expander_duration(expander_duration), generation_duration(generation_duration),
-                env_durations(env_durations), error(error) {}
+                env_durations(env_durations), error(error), log_critic(MIN_FLOAT) {}
 
         env_expansion(std::shared_ptr<theorem> &thm, size_t expander_duration, size_t generation_duration,
                       std::vector<size_t> &env_durations, std::vector<std::shared_ptr<env_effect>> &effects,

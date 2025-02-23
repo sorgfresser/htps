@@ -31,8 +31,8 @@ std::vector<std::shared_ptr<theorem>> MCTSSampleEffect::get_children() const {
     return children;
 }
 
-void MCTSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &children) const {
-    children = this->children;
+void MCTSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &children_vec) const {
+    children_vec = children;
 }
 
 size_t MCTSSampleEffect::size_goal() const {
@@ -180,6 +180,7 @@ Simulation::add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_p
     seen_set.insert(thm);
     seen.insert_or_assign(thm, seen_set);
     children_for_theorem.at(parent).push_back(thm);
+    parent_for_theorem.insert_or_assign(thm, parent);
 }
 
 size_t Simulation::leave_count() const {
@@ -188,6 +189,57 @@ size_t Simulation::leave_count() const {
         if (children.empty())
             count++;
     return count;
+}
+
+bool Simulation::erase_theorem_set(const std::shared_ptr<theorem> &thm) {
+    return seen.erase(thm);
+}
+
+void Simulation::receive_expansion(const std::shared_ptr<theorem> &thm, double value, bool is_solved) {
+    assert(expansions > 0);
+    set_value(thm, value);
+    set_solved(thm, is_solved);
+    expansions -= 1;
+}
+
+bool Simulation::get_virtual_count_added(const std::shared_ptr<theorem> &thm) const {
+    return virtual_count_added.at(thm);
+}
+
+void Simulation::set_virtual_count_added(const std::shared_ptr<theorem> &thm, bool value) {
+    virtual_count_added.insert_or_assign(thm, value);
+}
+
+bool Simulation::should_backup() const {
+    assert(expansions >= 0);
+    return expansions == 0;
+}
+
+std::shared_ptr<theorem> Simulation::parent(const std::shared_ptr<theorem> &thm) const {
+    if (!parent_for_theorem.contains(thm)) {
+        throw std::runtime_error("Parent not found");
+    }
+    return parent_for_theorem.at(thm);
+}
+
+std::vector<std::shared_ptr<theorem>> Simulation::get_children(const std::shared_ptr<theorem> &thm) const {
+    return children_for_theorem.at(thm);
+}
+
+std::vector<double> Simulation::child_values(const std::shared_ptr<theorem> &thm) const {
+    std::vector<double> result;
+    for (const auto &child: children_for_theorem.at(thm)) {
+        result.push_back(values.at(child));
+    }
+    return result;
+}
+
+void Simulation::reset_expansions() {
+    expansions = 0;
+}
+
+void Simulation::increment_expansions() {
+    expansions += 1;
 }
 
 void MCTSNode::reset_mcts_stats() {
@@ -201,15 +253,15 @@ bool MCTSNode::should_send(size_t count_threshold) const {
     if (solved) {
         return true;
     }
-    size_t count_sum = std::accumulate(counts.begin(), counts.end(), 0);
+    size_t count_sum = std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0));
     return count_sum >= count_threshold;
 }
 
 void MCTSNode::get_effect_samples(std::vector<MCTSSampleEffect> &samples, double subsampling_rate) const {
-    for (const auto &[tac, children]: effects) {
+    for (const auto &effect: effects) {
         if (dis(gen) > subsampling_rate)
             continue;
-        samples.emplace_back(thm, tac, children);
+        samples.emplace_back(thm, effect->tac, effect->children);
     }
 }
 
@@ -495,6 +547,41 @@ void MCTSNode::add_virtual_count(size_t tactic_id, size_t count) {
     virtual_counts[tactic_id] += count;
 }
 
+bool MCTSNode::_validate() const {
+    if (!policy)
+        return false;
+    if (q_value_solved == QValueSolvedCount)
+        return false;
+    if (tactics.empty())
+        return false;
+    if (children_for_tactic.size() != tactics.size())
+        return false;
+    if (children_for_tactic.size() != priors.size())
+        return false;
+    if (log_critic_value > 0.0)
+        return false;
+    // Assert is probability
+    double sum = std::accumulate(priors.begin(), priors.end(), 0.0);
+    if (sum < 0.99 || sum > 1.01)
+        return false;
+    // Assert we have at least one valid tactic
+    bool is_valid = std::any_of(tactics.begin(), tactics.end(), [](const auto &t) { return t->is_valid; });
+    return is_valid;
+}
+
+bool MCTSNode::has_virtual_count(size_t tactic_id) const {
+    return virtual_counts[tactic_id] > 0;
+}
+
+void MCTSNode::subtract_virtual_count(size_t tactic_id, size_t count) {
+    virtual_counts[tactic_id] -= count;
+    assert(virtual_counts[tactic_id] >= 0);
+}
+
+bool MCTSNode::has_virtual_count() const {
+    return std::any_of(virtual_counts.begin(), virtual_counts.end(), [](size_t count) { return count > 0; });
+}
+
 std::size_t std::hash<MCTSNode>::operator()(const MCTSNode &n) const {
     return std::hash<theorem>()(*n.get_theorem());
 }
@@ -516,7 +603,7 @@ bool MCTS::dead_root() const {
 
 void
 MCTS::get_train_samples(std::vector<MCTSSampleEffect> &samples_effects, std::vector<MCTSSampleCritic> &samples_critic,
-                        std::vector<MCTSSampleTactics> &samples_tactics) {
+                        std::vector<MCTSSampleTactics> &samples_tactics) const {
     std::vector<MCTSSampleCritic> critic_solved;
     std::vector<MCTSSampleCritic> critic_unsolved;
     // Will be less than the number of nodes, but we don't know how many
@@ -560,7 +647,7 @@ MCTS::get_train_samples(std::vector<MCTSSampleEffect> &samples_effects, std::vec
     samples_effects.shrink_to_fit();
 }
 
-void MCTS::get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics) {
+void MCTS::get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics) const {
     if (!is_proven())
         return;
     // Upper bound on the number of samples
@@ -588,6 +675,7 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         std::shared_ptr<theorem> current = to_process.front();
         to_process.pop_front();
         if (!nodes.contains(current)) {
+            // TODO: in theory there is some depth stuff here?
             to_expand.push_back(current);
             continue;
         }
@@ -639,6 +727,7 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             throw FailedTacticException();
         }
         mcts_node.add_virtual_count(tactic_id, params.virtual_loss);
+        sim.set_virtual_count_added(current, true);
         for (const auto &child: children) {
             sim.add_theorem(child, current, sim.get_depth(current) + 1);
             to_process.push_front(child);
@@ -658,4 +747,243 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
     }
     return sim;
 }
+
+void MCTS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved) {
+    // has to be log value
+    assert(value <= 0);
+    for (const auto &simulation: simulations_for_theorem.at(thm)) {
+        simulation->receive_expansion(thm, value, solved);
+    }
+    simulations_for_theorem.erase(thm);
+    currently_expanding.erase(thm);
+}
+
+void MCTS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
+    std::vector<MCTSNode> nodes;
+
+    for (const auto &expansion: expansions) {
+        if (expansion->is_error()) {
+            MCTSNode current = MCTSNode(
+                    expansion->thm, {}, {}, policy, {}, params.exploration, MIN_FLOAT,
+                    params.q_value_solved, params.tactic_init_value, expansion->effects);
+            receive_expansion(expansion->thm, MIN_FLOAT, false);
+            nodes.push_back(current);
+            continue;
+        }
+        assert(expansion->log_critic > MIN_FLOAT);
+        assert(!expansion->tactics.empty());
+        assert(!expansion->children_for_tactic.empty());
+        assert(!expansion->priors.empty());
+        // If one tactic solves, all tactics of the expansion should solve
+        if (expansion->children_for_tactic.at(0).empty()) {
+            assert(std::all_of(expansion->children_for_tactic.begin(), expansion->children_for_tactic.end(),
+                               [](const auto &children) {
+                                   return children.empty();
+                               }));
+            assert(std::all_of(expansion->tactics.begin(), expansion->tactics.end(),
+                               [](const std::shared_ptr<tactic> &tactic) {
+                                   return tactic->is_valid;
+                               }));
+            // Solved gets value 1, i.e. log value 0
+            MCTSNode current = MCTSNode(
+                    expansion->thm, expansion->tactics, expansion->children_for_tactic, policy, expansion->priors,
+                    params.exploration, 0.0, params.q_value_solved, params.tactic_init_value, expansion->effects);
+            receive_expansion(expansion->thm, 0.0, true);
+            nodes.push_back(current);
+            continue;
+        }
+        MCTSNode current = MCTSNode(
+                expansion->thm, expansion->tactics, expansion->children_for_tactic, policy, expansion->priors,
+                params.exploration, expansion->log_critic, params.q_value_solved, params.tactic_init_value,
+                expansion->effects);
+        receive_expansion(expansion->thm, expansion->log_critic, true);
+        nodes.push_back(current);
+    }
+    add_nodes(nodes);
+    expansion_count += 1;
+}
+
+void MCTS::cleanup(Simulation &to_clean) {
+    MCTSNode current;
+    for (const auto &[unique_str, thm]: to_clean) {
+        if (!nodes.contains(thm))
+            continue;
+        current = nodes.at(thm);
+        if (to_clean.get_virtual_count_added(thm)) {
+            current.subtract_virtual_count(to_clean.get_tactic_id(thm), params.virtual_loss);
+        }
+    }
+}
+
+void MCTS::backup() {
+    bool only_value;
+    long i = 0;
+    while (i < simulations.size()) {
+        auto simulation = simulations[i];
+        if (!simulation->should_backup()) {
+            i += 1;
+            continue;
+        }
+        only_value = false;
+        if (params.backup_once) {
+            auto hashed = std::hash<htps::Simulation>{}(*simulation);
+            if (backedup_hashes.contains(hashed))
+                only_value = true;
+            else
+                backedup_hashes.insert(hashed);
+        }
+        backup_leaves(simulation, only_value);
+        simulations.erase(simulations.begin() + i);
+    }
+}
+
+void MCTS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
+    auto leaves = sim->leaves();
+    bool updated_root = false;
+    std::queue<std::shared_ptr<theorem>> to_process;
+
+    TheoremMap<size_t> children_propagated;
+    for (const auto &leaf: leaves) {
+        MCTSNode current = nodes.at(leaf);
+        if (sim->get_virtual_count_added(leaf)) {
+            current.subtract_virtual_count(sim->get_tactic_id(leaf), params.virtual_loss);
+        }
+        assert(sim->get_value(leaf) <= 0); // log
+        auto parent = sim->parent(leaf);
+        if (!parent) {
+            assert(leaf == root);
+            updated_root = true;
+            continue;
+        }
+        if (!children_propagated.contains(parent)) {
+            children_propagated.insert_or_assign(parent, 1);
+        } else {
+            children_propagated.at(parent) += 1;
+            assert(children_propagated.at(parent) <= sim->get_children(parent).size());
+        }
+        if (children_propagated.at(parent) == sim->get_children(parent).size()) {
+            to_process.push(parent);
+        }
+    }
+    while (!to_process.empty()) {
+        auto cur = to_process.front();
+        to_process.pop();
+        std::vector<double> child_values = sim->child_values(cur);
+        assert(std::all_of(child_values.begin(), child_values.end(), [](const auto &v) { return v <= 0; }));
+        double sum_log = std::accumulate(child_values.begin(), child_values.end(), 0.0);
+        MCTSNode current_node = nodes.at(cur);
+        if (current_node.is_solved() && params.backup_one_for_solved) {
+            sum_log = 0.0;
+        }
+        if (params.depth_penalty < 1) {
+            sum_log += std::log(params.depth_penalty);
+        }
+        assert(sum_log <= 0);
+        sim->set_value(cur, sum_log);
+        if (sim->get_virtual_count_added(cur)) {
+            current_node.subtract_virtual_count(sim->get_tactic_id(cur), params.virtual_loss);
+        }
+        if (!only_value) {
+            current_node.update(sim->get_tactic_id(cur), sum_log);
+        }
+        if (!sim->parent(cur)) {
+            updated_root = true;
+            continue;
+        }
+        children_propagated.at(sim->parent(cur)) += 1;
+        if (children_propagated.at(sim->parent(cur)) == sim->get_children(sim->parent(cur)).size()) {
+            to_process.push(sim->parent(cur));
+        }
+    }
+    assert(updated_root);
+}
+
+void MCTS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+    propagate_needed = false;
+    TheoremMap<std::shared_ptr<theorem>> result;
+    theorems.clear();
+    std::vector<std::shared_ptr<theorem>> single_to_expand;
+
+    for (size_t i = 0; i < params.succ_expansions; i++) {
+        single_to_expand.clear();
+        std::vector<std::shared_ptr<theorem>> terminal;
+        std::vector<std::shared_ptr<theorem>> to_expand;
+        Simulation sim = find_leaves_to_expand(terminal, to_expand);
+        if (to_expand.empty()) {
+            break;
+        }
+        _single_to_expand(single_to_expand, sim, to_expand);
+        for (const auto &thm: single_to_expand) {
+            result.insert(thm, thm);
+        }
+    }
+    if (result.empty()) {
+        done = true;
+        return;
+    }
+    // TODO: maybe we need the n_expansions here to decide whether we are done
+    for (const auto &[unique_str, thm]: result) {
+        theorems.push_back(thm);
+    }
+}
+
+void MCTS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
+                             std::vector<std::shared_ptr<theorem>> &leaves_to_expand) {
+    theorems.clear();
+    TheoremSet seen;
+    std::shared_ptr<Simulation> sim_ptr = std::make_shared<Simulation>(sim);
+    sim_ptr->reset_expansions();
+    simulations.push_back(sim_ptr);
+    for (const auto &leaf: leaves_to_expand) {
+        if (!seen.contains(leaf)) {
+            seen.insert(leaf);
+            if (simulations_for_theorem.contains(leaf))
+                simulations_for_theorem.at(leaf).push_back(sim_ptr);
+            else
+                simulations_for_theorem.insert(leaf, std::vector<std::shared_ptr<Simulation>>{sim_ptr});
+            sim_ptr->increment_expansions();
+        }
+        if (!currently_expanding.contains(leaf)) {
+            currently_expanding.insert(leaf);
+            theorems.push_back(leaf);
+        }
+    }
+}
+
+std::vector<std::shared_ptr<theorem>> MCTS::batch_to_expand() {
+    std::vector<std::shared_ptr<theorem>> theorems;
+    batch_to_expand(theorems);
+    return theorems;
+}
+
+void MCTS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions) {
+    expand(expansions);
+    backup();
+
+    assert(std::none_of(nodes.begin(), nodes.end(), [](const auto &node) {
+        return node.second.has_virtual_count();
+    }));
+    if (is_proven() && !initial_minimum_proof_size.has_value()) {
+        build_in_proof();
+        get_node_proof_sizes_and_depths();
+        for (size_t i = 0; i < METRIC_COUNT; i++) {
+            initial_minimum_proof_size.set(static_cast<Metric>(i),
+                                           nodes.at(root).minimum_length(static_cast<Metric>(i)));
+            assert(initial_minimum_proof_size.has_value(static_cast<Metric>(i)));
+        }
+        reset_minimum_proof_stats();
+    }
+    if (is_proven()) {
+        done = done || params.early_stopping;
+    }
+    assert(nodes.size() == expansion_count); // not sure whether this is correct
+    done = done || (expansion_count >= params.num_expansions);
+    if (!done)
+        mcts_move();
+}
+
+void MCTS::mcts_move() {
+
+}
+
 

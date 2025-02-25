@@ -2,8 +2,8 @@
 // Created by simon on 12.02.25.
 //
 
-#ifndef HTPS_MCTS_H
-#define HTPS_MCTS_H
+#ifndef HTPS_HTPS_H
+#define HTPS_HTPS_H
 
 #include "graph.h"
 #include "base.h"
@@ -23,19 +23,18 @@ namespace htps {
 
     std::mt19937 setup_gen();
 
-    std::mt19937 gen = setup_gen();
-    std::uniform_real_distribution<double> dis = std::uniform_real_distribution<double>(0, 1);
+    extern std::mt19937 gen;
+    extern std::uniform_real_distribution<double> dis;
 
-
-    class MCTSSampleEffect {
+    class HTPSSampleEffect {
     private:
         std::shared_ptr<theorem> goal;
         std::shared_ptr<tactic> tac;
         std::vector<std::shared_ptr<theorem>> children;
     public:
-        MCTSSampleEffect(const std::shared_ptr<theorem> goal, const std::shared_ptr<tactic> tac,
-                         const std::vector<std::shared_ptr<theorem>> &children) : goal(std::move(goal)),
-                                                                                  tac(std::move(tac)),
+        HTPSSampleEffect(const std::shared_ptr<theorem> &goal, const std::shared_ptr<tactic> &tac,
+                         const std::vector<std::shared_ptr<theorem>> &children) : goal(goal),
+                                                                                  tac(tac),
                                                                                   children(children) {}
 
 
@@ -50,7 +49,7 @@ namespace htps {
         size_t size_goal() const;
     };
 
-    class MCTSSampleCritic {
+    class HTPSSampleCritic {
     private:
         std::shared_ptr<theorem> goal;
         double q_estimate;
@@ -60,7 +59,7 @@ namespace htps {
         size_t visit_count;
 
     public:
-        MCTSSampleCritic(std::shared_ptr<theorem> goal, double q_estimate, bool solved, bool bad, double critic,
+        HTPSSampleCritic(std::shared_ptr<theorem> goal, double q_estimate, bool solved, bool bad, double critic,
                          size_t visit_count) :
                 goal(std::move(goal)), q_estimate(q_estimate), solved(solved), bad(bad), critic(critic),
                 visit_count(visit_count) {
@@ -78,7 +77,7 @@ namespace htps {
         InProofCount
     };
 
-    class MCTSSampleTactics {
+    class HTPSSampleTactics {
     private:
         std::shared_ptr<theorem> goal;
         std::vector<std::shared_ptr<tactic>> tactics;
@@ -88,7 +87,7 @@ namespace htps {
         size_t visit_count;
 
     public:
-        MCTSSampleTactics(std::shared_ptr<theorem> goal, const std::vector<std::shared_ptr<tactic>> &tactics,
+        HTPSSampleTactics(std::shared_ptr<theorem> goal, const std::vector<std::shared_ptr<tactic>> &tactics,
                           const std::vector<double> &target_pi, enum InProof inproof,
                           const std::vector<double> &q_estimates,
                           size_t visit_count) :
@@ -130,10 +129,10 @@ namespace htps {
     };
 
 
-    struct mcts_params {
+    struct htps_params {
         double exploration;
         PolicyType policy_type;
-        size_t num_expansions; // maximal number of expansions until the MCTS is considered done
+        size_t num_expansions; // maximal number of expansions until the HTPS is considered done
         size_t succ_expansions; // number of expansions in a batch
         bool early_stopping;
         bool no_critic;
@@ -157,7 +156,7 @@ namespace htps {
         size_t virtual_loss; // The number of virtual count added for each visit
     };
 
-    // A single simulation of the MCTS algorithm
+    // A single simulation of the HTPS algorithm
     class Simulation {
     private:
         TheoremMap<std::shared_ptr<theorem>> theorems;
@@ -191,6 +190,8 @@ namespace htps {
             theorems.insert(root, root);
             depth.insert(root, 0);
             parent_for_theorem.insert(root, nullptr);
+            children_for_theorem.insert(root, {});
+            virtual_count_added.insert(root, false);
         }
 
         void set_depth(const std::shared_ptr<theorem> &thm, size_t d);
@@ -282,7 +283,7 @@ struct std::hash<htps::Simulation> {
 
 
 namespace htps {
-    class MCTSNode : public Node {
+    class HTPSNode : public Node {
     private:
         double old_critic_value{};
         double log_critic_value{};
@@ -311,7 +312,7 @@ namespace htps {
         bool _validate() const;
 
     public:
-        MCTSNode(const std::shared_ptr<theorem> &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
+        HTPSNode(const std::shared_ptr<theorem> &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
                  const std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic,
                  const std::shared_ptr<Policy> &policy, const std::vector<double> &priors,
                  const double exploration, const double log_critic_value, const QValueSolved q_value_solved,
@@ -323,10 +324,10 @@ namespace htps {
                 tactic_init_value(tactic_init_value), effects(effects), reset_mask(tactics.size()),
                 log_w(tactics.size()) {
             assert(_validate());
-            reset_mcts_stats();
+            reset_HTPS_stats();
         }
 
-        MCTSNode(const MCTSNode &node)
+        HTPSNode(const HTPSNode &node)
                 : Node(node),
                   old_critic_value(node.old_critic_value),
                   log_critic_value(node.log_critic_value),
@@ -339,24 +340,24 @@ namespace htps {
                   reset_mask(node.reset_mask),
                   log_w(node.log_w) {
             assert(_validate());
-            reset_mcts_stats();
+            reset_HTPS_stats();
         }
 
-        MCTSNode() = default;
+        HTPSNode() = default;
 
-        /* Reset the MCTS statistics, resetting counts and logW values.
+        /* Reset the HTPS statistics, resetting counts and logW values.
          * */
-        void reset_mcts_stats();
+        void reset_HTPS_stats();
 
         bool should_send(size_t count_threshold) const;
 
-        void get_effect_samples(std::vector<MCTSSampleEffect> &samples, double subsampling_rate = 1.0) const;
+        void get_effect_samples(std::vector<HTPSSampleEffect> &samples, double subsampling_rate = 1.0) const;
 
-        std::vector<MCTSSampleEffect> get_effect_samples(double subsampling_rate = 1.0) const;
+        std::vector<HTPSSampleEffect> get_effect_samples(double subsampling_rate = 1.0) const;
 
-        std::optional<MCTSSampleCritic> get_critic_sample(double subsampling_rate = 1.0) const;
+        std::optional<HTPSSampleCritic> get_critic_sample(double subsampling_rate = 1.0) const;
 
-        std::optional<MCTSSampleTactics>
+        std::optional<HTPSSampleTactics>
         get_tactics_sample(Metric metric, NodeMask node_mask, bool only_learn_best_tactics, double p_threshold = 0.0,
                            size_t count_threshold = 0, bool for_q_conditioning = false) const;
 
@@ -383,11 +384,36 @@ namespace htps {
 }
 
 template<>
-struct std::hash<htps::MCTSNode> {
-    std::size_t operator()(const htps::MCTSNode &n) const;
+struct std::hash<htps::HTPSNode> {
+    std::size_t operator()(const htps::HTPSNode &n) const;
 };
 
 namespace htps {
+    class HTPSResult {
+    private:
+        std::vector<HTPSSampleCritic> samples_critic;
+        std::vector<HTPSSampleTactics> samples_tactic;
+        std::vector<HTPSSampleEffect> samples_effect;
+        Metric metric;
+        std::vector<HTPSSampleTactics> proof_samples_tactics;
+        std::shared_ptr<theorem> goal;
+        struct proof p;
+    public:
+        HTPSResult(std::vector<HTPSSampleCritic> &samples_critic, std::vector<HTPSSampleTactics> &samples_tactic,
+                   std::vector<HTPSSampleEffect> &samples_effect, Metric metric,
+                   std::vector<HTPSSampleTactics> &proof_samples_tactics, std::shared_ptr<theorem> &goal,
+                   struct proof &p) :
+                samples_critic(samples_critic), samples_tactic(samples_tactic), samples_effect(samples_effect),
+                metric(metric), proof_samples_tactics(proof_samples_tactics), goal(goal),
+                p(p) {}
+
+        struct proof get_proof() const;
+
+        std::shared_ptr<theorem> get_goal() const;
+
+        std::tuple<std::vector<HTPSSampleCritic>, std::vector<HTPSSampleTactics>, std::vector<HTPSSampleEffect>, Metric, std::vector<HTPSSampleTactics>>
+        get_samples() const;
+    };
 
 /**
  * @class FailedTacticException
@@ -405,16 +431,16 @@ namespace htps {
     };
 
 
-    class MCTS : Graph<MCTSNode, PrioritizedNode> {
+    class HTPS : public Graph<HTPSNode, PrioritizedNode> {
     private:
         std::shared_ptr<Policy> policy;
-        mcts_params params;
+        htps_params params;
         size_t expansion_count;
         std::vector<std::shared_ptr<Simulation>> simulations; // Currently ongoing simulations. Once a simulation is at 0 awaiting expansions, it is removed
         TheoremMap<std::vector<std::shared_ptr<Simulation>>> simulations_for_theorem; // The Simulations that need to be adjusted if we receive an expanded theorem
-        std::vector<MCTSSampleEffect> train_samples_effects;
-        std::vector<MCTSSampleCritic> train_samples_critic;
-        std::vector<MCTSSampleTactics> train_samples_tactics;
+        std::vector<HTPSSampleEffect> train_samples_effects;
+        std::vector<HTPSSampleCritic> train_samples_critic;
+        std::vector<HTPSSampleTactics> train_samples_tactics;
         std::unordered_set<size_t> backedup_hashes;
         TheoremSet currently_expanding; // Theorems that are currently being expanded
         bool propagate_needed; // Whether propagation is required. Is set to true whenever find_to_expand fails
@@ -424,9 +450,9 @@ namespace htps {
                                std::vector<std::shared_ptr<theorem>> &leaves_to_expand);
 
     protected:
-        bool is_leaf(const MCTSNode &node) const;
+        bool is_leaf(const HTPSNode &node) const;
 
-        /* Upon receiving an expansion which we add to the graph, we need to update the MCTS statistics.
+        /* Upon receiving an expansion which we add to the graph, we need to update the HTPS statistics.
          * For this, the value is set in each Simulation that still has the theorem in its
          *
          * */
@@ -445,11 +471,16 @@ namespace htps {
         void cleanup(Simulation &to_clean);
 
     public:
-        void get_train_samples(std::vector<MCTSSampleEffect> &samples_effects,
-                               std::vector<MCTSSampleCritic> &samples_critic,
-                               std::vector<MCTSSampleTactics> &samples_tactics) const;
+        HTPS(std::shared_ptr<theorem> &root, const htps_params &params, std::shared_ptr<Policy> &policy) :
+                Graph<HTPSNode, PrioritizedNode>(root), policy(policy), params(params), expansion_count(0),
+                train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
+                currently_expanding(), propagate_needed(true), done(false) {};
 
-        void get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics) const;
+        void get_train_samples(std::vector<HTPSSampleEffect> &samples_effects,
+                               std::vector<HTPSSampleCritic> &samples_critic,
+                               std::vector<HTPSSampleTactics> &samples_tactics) const;
+
+        void get_proof_samples(std::vector<HTPSSampleTactics> &proof_samples_tactics) const;
 
         void find_unexplored_and_propagate_expandable();
 
@@ -460,13 +491,13 @@ namespace htps {
 
         void expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions);
 
-        void mcts_move();
-
         std::vector<std::shared_ptr<theorem>> theorems_to_expand();
 
         void theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
+
+        HTPSResult get_result();
     };
 
 }
 
-#endif //HTPS_MCTS_H
+#endif //HTPS_HTPS_H

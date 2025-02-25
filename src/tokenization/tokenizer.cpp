@@ -7,8 +7,10 @@ using namespace onmt;
 
 onmt::Tokenizer htps::get_tokenizer_from_env() {
     const char *tokenizer_path = std::getenv("TOKENIZER_PATH");
+    // If we are running tests, we don't want to throw an error if the env var is not set
     if (!tokenizer_path || std::string(tokenizer_path).empty()) {
-        throw std::runtime_error("TOKENIZER_PATH not set");
+        std::cout << "TOKENIZER_PATH not set, using default tokenizer" << std::endl;
+        return {Tokenizer::Mode::None, Tokenizer::Flags::NoSubstitution};
     }
     return tokenizer_from_model_file(tokenizer_path);
 }

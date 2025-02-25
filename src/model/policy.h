@@ -10,7 +10,7 @@
 #include <limits>
 
 namespace htps {
-    constexpr double MIN_FLOAT = std::numeric_limits<double>::min() / 2; // Avoid underflow
+    constexpr double MIN_FLOAT = -std::numeric_limits<double>::infinity(); // Avoid underflow, use float min
     enum PolicyType {
         AlphaZero, RPO, PolicyTypeCount
     };
@@ -23,14 +23,14 @@ namespace htps {
         double exploration;
 
     public:
-        /* Get the policy for a given set of q-values and pi-values
+         /* Get the policy for a given set of q-values and pi-values
          * q_values: The q-values for each action
          * pi_values: The prior values for each action
          * counts: The number of times each action has been taken
          * result: The resulting policy vector
          * */
         void get_policy(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                        const std::vector<size_t> counts, std::vector<double> &result) const;
+                        const std::vector<size_t> &counts, std::vector<double> &result) const;
 
         Policy(PolicyType type, double exploration) : type(type), exploration(exploration) {
             assert(type != PolicyTypeCount);
@@ -38,13 +38,13 @@ namespace htps {
 
     protected:
         void alpha_zero(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                        const std::vector<size_t> counts, std::vector<double> &result) const;
+                        const std::vector<size_t> &counts, std::vector<double> &result) const;
 
         void mcts_rpo(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                      const std::vector<size_t> counts, std::vector<double> &result) const;
+                      const std::vector<size_t> &counts, std::vector<double> &result) const;
 
-        double find_rpo_alpha(double alpha_min, double alpha_max, const std::vector<double> &q_values,
-                              const std::vector<double> &scaled_pi_values) const;
+        static double find_rpo_alpha(double alpha_min, double alpha_max, const std::vector<double> &q_values,
+                                     const std::vector<double> &scaled_pi_values);
     };
 }
 #endif //HTPS_POLICY_H

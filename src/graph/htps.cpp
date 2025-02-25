@@ -2,8 +2,7 @@
 // Created by simon on 12.02.25.
 //
 
-#include "mcts.h"
-#include "../model/policy.h"
+#include "htps.h"
 #include <memory>
 #include <vector>
 #include <numeric>
@@ -19,44 +18,47 @@ std::mt19937 htps::setup_gen() {
     return std::mt19937(seed);
 }
 
-std::shared_ptr<theorem> MCTSSampleEffect::get_goal() const {
+std::mt19937 htps::gen = setup_gen();
+std::uniform_real_distribution<double> htps::dis = std::uniform_real_distribution<double>(0, 1);
+
+std::shared_ptr<theorem> HTPSSampleEffect::get_goal() const {
     return goal;
 }
 
-std::shared_ptr<tactic> MCTSSampleEffect::get_tactic() const {
+std::shared_ptr<tactic> HTPSSampleEffect::get_tactic() const {
     return tac;
 }
 
-std::vector<std::shared_ptr<theorem>> MCTSSampleEffect::get_children() const {
+std::vector<std::shared_ptr<theorem>> HTPSSampleEffect::get_children() const {
     return children;
 }
 
-void MCTSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &children_vec) const {
+void HTPSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &children_vec) const {
     children_vec = children;
 }
 
-size_t MCTSSampleEffect::size_goal() const {
+size_t HTPSSampleEffect::size_goal() const {
     if (!goal) {
         throw std::runtime_error("Goal is null, cannot get size");
     }
     return (goal->tokenize()).size();
 }
 
-size_t MCTSSampleCritic::size_goal() const {
+size_t HTPSSampleCritic::size_goal() const {
     if (!goal) {
         throw std::runtime_error("Goal is null, cannot get size");
     }
     return (goal->tokenize()).size();
 }
 
-size_t MCTSSampleTactics::size_goal() const {
+size_t HTPSSampleTactics::size_goal() const {
     if (!goal) {
         throw std::runtime_error("Goal is null, cannot get size");
     }
     return (goal->tokenize()).size();
 }
 
-size_t MCTSSampleTactics::avg_size_tactic() const {
+size_t HTPSSampleTactics::avg_size_tactic() const {
     size_t sum = 0;
     for (const auto &tactic: tactics) {
         sum += tactic->tokenize().size();
@@ -203,6 +205,8 @@ void Simulation::receive_expansion(const std::shared_ptr<theorem> &thm, double v
 }
 
 bool Simulation::get_virtual_count_added(const std::shared_ptr<theorem> &thm) const {
+    if (!virtual_count_added.contains(thm))
+        throw std::runtime_error("Virtual count not found");
     return virtual_count_added.at(thm);
 }
 
@@ -242,14 +246,14 @@ void Simulation::increment_expansions() {
     expansions += 1;
 }
 
-void MCTSNode::reset_mcts_stats() {
+void HTPSNode::reset_HTPS_stats() {
     // implies we will simply set logW to the first value we receive
     reset_mask = std::vector<bool>(tactics.size(), true);
     counts = std::vector<size_t>(tactics.size(), 0);
     virtual_counts = std::vector<size_t>(tactics.size(), 0);
 }
 
-bool MCTSNode::should_send(size_t count_threshold) const {
+bool HTPSNode::should_send(size_t count_threshold) const {
     if (solved) {
         return true;
     }
@@ -257,7 +261,7 @@ bool MCTSNode::should_send(size_t count_threshold) const {
     return count_sum >= count_threshold;
 }
 
-void MCTSNode::get_effect_samples(std::vector<MCTSSampleEffect> &samples, double subsampling_rate) const {
+void HTPSNode::get_effect_samples(std::vector<HTPSSampleEffect> &samples, double subsampling_rate) const {
     for (const auto &effect: effects) {
         if (dis(gen) > subsampling_rate)
             continue;
@@ -265,23 +269,23 @@ void MCTSNode::get_effect_samples(std::vector<MCTSSampleEffect> &samples, double
     }
 }
 
-std::vector<MCTSSampleEffect> MCTSNode::get_effect_samples(double subsampling_rate) const {
-    std::vector<MCTSSampleEffect> samples;
+std::vector<HTPSSampleEffect> HTPSNode::get_effect_samples(double subsampling_rate) const {
+    std::vector<HTPSSampleEffect> samples;
     get_effect_samples(samples, subsampling_rate);
     return samples;
 }
 
-std::optional<MCTSSampleCritic> MCTSNode::get_critic_sample(double subsampling_rate) const {
+std::optional<HTPSSampleCritic> HTPSNode::get_critic_sample(double subsampling_rate) const {
     if (dis(gen) > subsampling_rate) {
         return std::nullopt;
     }
     // Compute visit count of the node by summing up all action counts
     size_t visit_sum = std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0));
-    return MCTSSampleCritic(thm, std::exp(get_value()), solved, false, log_critic_value, visit_sum);
+    return HTPSSampleCritic(thm, std::exp(get_value()), solved, false, log_critic_value, visit_sum);
 }
 
 
-void MCTSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
+void HTPSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
                                                  std::vector<std::shared_ptr<tactic>> &valid_tactics,
                                                  std::vector<double> &valid_priors,
                                                  std::vector<double> &valid_targets,
@@ -327,7 +331,7 @@ void MCTSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
     assert (q_values.size() == valid_targets.size());
 }
 
-void MCTSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
+void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
                                           bool only_learn_best_tactics, double p_threshold,
                                           std::vector<std::shared_ptr<tactic>> &valid_tactics,
                                           std::vector<double> &valid_priors,
@@ -368,14 +372,15 @@ void MCTSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
     }
         // If the node is solved, take the uniform distribution over all solving tactics
     else {
-        std::fill(valid_targets.begin(), valid_targets.end(), 1.0 / tactics.size());
+        valid_targets.resize(selected_tactic_ids.size());
+        std::fill(valid_targets.begin(), valid_targets.begin(), 1.0 / tactics.size());
     }
     assert(selected_tactic_ids.size() == valid_targets.size());
     assert(selected_tactic_ids.size() == valid_priors.size());
     assert(selected_tactic_ids.size() == valid_tactics.size());
 }
 
-std::optional<MCTSSampleTactics> MCTSNode::get_tactics_sample(Metric metric, NodeMask node_mask,
+std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, NodeMask node_mask,
                                                               bool only_learn_best_tactics, double p_threshold,
                                                               size_t count_threshold, bool for_q_conditioning) const {
     if (!should_send(count_threshold)) {
@@ -424,10 +429,10 @@ std::optional<MCTSSampleTactics> MCTSNode::get_tactics_sample(Metric metric, Nod
     }
     // Compute visit count of the node by summing up all action counts
     size_t visit_sum = std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0));
-    return MCTSSampleTactics(thm, valid_tactics, valid_targets, inproof, q_values, visit_sum);
+    return HTPSSampleTactics(thm, valid_tactics, valid_targets, inproof, q_values, visit_sum);
 }
 
-bool MCTSNode::kill_tactic(size_t tactic_id) {
+bool HTPSNode::kill_tactic(size_t tactic_id) {
     bool killed = Node::kill_tactic(tactic_id);
     if (all_tactics_killed()) {
         assert(log_critic_value > MIN_FLOAT);
@@ -437,7 +442,7 @@ bool MCTSNode::kill_tactic(size_t tactic_id) {
     return killed;
 }
 
-void MCTSNode::compute_policy(std::vector<double> &result, bool force_expansion) const {
+void HTPSNode::compute_policy(std::vector<double> &result, bool force_expansion) const {
     std::vector<size_t> full_counts;
     full_counts.reserve(tactics.size());
     result.reserve(tactics.size());
@@ -500,13 +505,13 @@ void MCTSNode::compute_policy(std::vector<double> &result, bool force_expansion)
     }
 }
 
-std::vector<double> MCTSNode::compute_policy(bool force_expansion) const {
+std::vector<double> HTPSNode::compute_policy(bool force_expansion) const {
     std::vector<double> result;
     compute_policy(result, force_expansion);
     return result;
 }
 
-void MCTSNode::update(size_t tactic_id, double backup_value) {
+void HTPSNode::update(size_t tactic_id, double backup_value) {
     counts[tactic_id]++;
     // Compute logsumexp of these two values. We simplify the computation by assuming logw is the larger of the two
     // We can make that simplification because the equations hold for arbitrary constants c, therefore also for the smaller value
@@ -519,7 +524,7 @@ void MCTSNode::update(size_t tactic_id, double backup_value) {
     }
 }
 
-double MCTSNode::get_value() const {
+double HTPSNode::get_value() const {
     if (solved)
         return 0.0;
     if (is_terminal())
@@ -543,11 +548,11 @@ double MCTSNode::get_value() const {
     return std::min(0.0, result);
 }
 
-void MCTSNode::add_virtual_count(size_t tactic_id, size_t count) {
+void HTPSNode::add_virtual_count(size_t tactic_id, size_t count) {
     virtual_counts[tactic_id] += count;
 }
 
-bool MCTSNode::_validate() const {
+bool HTPSNode::_validate() const {
     if (!policy)
         return false;
     if (q_value_solved == QValueSolvedCount)
@@ -569,50 +574,50 @@ bool MCTSNode::_validate() const {
     return is_valid;
 }
 
-bool MCTSNode::has_virtual_count(size_t tactic_id) const {
+bool HTPSNode::has_virtual_count(size_t tactic_id) const {
     return virtual_counts[tactic_id] > 0;
 }
 
-void MCTSNode::subtract_virtual_count(size_t tactic_id, size_t count) {
+void HTPSNode::subtract_virtual_count(size_t tactic_id, size_t count) {
     virtual_counts[tactic_id] -= count;
     assert(virtual_counts[tactic_id] >= 0);
 }
 
-bool MCTSNode::has_virtual_count() const {
+bool HTPSNode::has_virtual_count() const {
     return std::any_of(virtual_counts.begin(), virtual_counts.end(), [](size_t count) { return count > 0; });
 }
 
-std::size_t std::hash<MCTSNode>::operator()(const MCTSNode &n) const {
+std::size_t std::hash<HTPSNode>::operator()(const HTPSNode &n) const {
     return std::hash<theorem>()(*n.get_theorem());
 }
 
-bool MCTS::is_leaf(const htps::MCTSNode &node) const {
+bool HTPS::is_leaf(const htps::HTPSNode &node) const {
     return node.is_solved() && !(is_proven()) && (params.early_stopping_solved_if_root_not_proven);
 }
 
-void MCTS::find_unexplored_and_propagate_expandable() {
+void HTPS::find_unexplored_and_propagate_expandable() {
     if (!propagate_needed)
         return;
     bool ignore_solved = params.early_stopping || (!is_proven() && params.early_stopping_solved_if_root_not_proven);
     Graph::find_unexplored_and_propagate_expandable(ignore_solved);
 }
 
-bool MCTS::dead_root() const {
+bool HTPS::dead_root() const {
     return (propagate_needed && unexplored_theorems.empty()) || (nodes.contains(root) && nodes.at(root).is_bad());
 }
 
 void
-MCTS::get_train_samples(std::vector<MCTSSampleEffect> &samples_effects, std::vector<MCTSSampleCritic> &samples_critic,
-                        std::vector<MCTSSampleTactics> &samples_tactics) const {
-    std::vector<MCTSSampleCritic> critic_solved;
-    std::vector<MCTSSampleCritic> critic_unsolved;
+HTPS::get_train_samples(std::vector<HTPSSampleEffect> &samples_effects, std::vector<HTPSSampleCritic> &samples_critic,
+                        std::vector<HTPSSampleTactics> &samples_tactics) const {
+    std::vector<HTPSSampleCritic> critic_solved;
+    std::vector<HTPSSampleCritic> critic_unsolved;
     // Will be less than the number of nodes, but we don't know how many
     critic_solved.reserve(nodes.size());
     critic_unsolved.reserve(nodes.size());
     samples_critic.reserve(nodes.size());
     samples_tactics.reserve(nodes.size());
     samples_effects.reserve(nodes.size());
-    std::vector<MCTSSampleEffect> node_samples;
+    std::vector<HTPSSampleEffect> node_samples;
     NodeMask node_mask = params.node_mask;
     if (node_mask == MinimalProofSolving) {
         if (is_proven())
@@ -639,15 +644,15 @@ MCTS::get_train_samples(std::vector<MCTSSampleEffect> &samples_effects, std::vec
         if (tactic_sample) {
             samples_tactics.push_back(tactic_sample.value());
         }
-        samples_critic = std::move(critic_solved);
-        samples_critic.insert(samples_critic.end(), critic_unsolved.begin(), critic_unsolved.end());
     }
+    samples_critic = std::move(critic_solved);
+    samples_critic.insert(samples_critic.end(), critic_unsolved.begin(), critic_unsolved.end());
     samples_critic.shrink_to_fit();
     samples_tactics.shrink_to_fit();
     samples_effects.shrink_to_fit();
 }
 
-void MCTS::get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tactics) const {
+void HTPS::get_proof_samples(std::vector<HTPSSampleTactics> &proof_samples_tactics) const {
     if (!is_proven())
         return;
     // Upper bound on the number of samples
@@ -663,7 +668,7 @@ void MCTS::get_proof_samples(std::vector<MCTSSampleTactics> &proof_samples_tacti
     proof_samples_tactics.shrink_to_fit();
 }
 
-Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
+Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
                                        std::vector<std::shared_ptr<theorem>> &to_expand) {
     Simulation sim = Simulation(root);
     std::deque<std::shared_ptr<theorem>> to_process;
@@ -679,23 +684,23 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             to_expand.push_back(current);
             continue;
         }
-        auto mcts_node = nodes.at(current);
-        bool is_leaf_node = is_leaf(mcts_node);
-        if (mcts_node.is_terminal() || is_leaf_node) {
-            assert(mcts_node.is_solved() || is_leaf_node);
-            sim.set_value(current, mcts_node.get_value());
+        auto HTPS_node = nodes.at(current);
+        bool is_leaf_node = is_leaf(HTPS_node);
+        if (HTPS_node.is_terminal() || is_leaf_node) {
+            assert(HTPS_node.is_solved() || is_leaf_node);
+            sim.set_value(current, HTPS_node.get_value());
             sim.set_solved(current, true);
             terminal.push_back(current);
             continue;
         }
-        if (params.early_stopping && mcts_node.is_solved()) {
+        if (params.early_stopping && HTPS_node.is_solved()) {
             sim.set_value(current, 0.0);
             sim.set_solved(current, true);
             terminal.push_back(current);
             continue;
         }
         // Select subsequent tactic
-        mcts_node.compute_policy(node_policy, true);
+        HTPS_node.compute_policy(node_policy, true);
         size_t tactic_id;
         if (params.policy_temperature == 0) {
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
@@ -713,20 +718,20 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             std::discrete_distribution<size_t> dist(node_policy.begin(), node_policy.end());
             tactic_id = dist(gen);
         }
-        assert(!mcts_node.killed(tactic_id));
-        auto tactic_ptr = mcts_node.get_tactic(tactic_id);
+        assert(!HTPS_node.killed(tactic_id));
+        auto tactic_ptr = HTPS_node.get_tactic(tactic_id);
         sim.set_tactic(current, tactic_ptr);
         sim.set_tactic_id(current, tactic_id);
-        auto children = mcts_node.get_children_for_tactic(tactic_id);
+        auto children = HTPS_node.get_children_for_tactic(tactic_id);
         TheoremSet &seen = sim.get_theorem_set(current);
         // If any child has been seen, we have a circle, i.e. kill the tactic
         if (std::any_of(children.begin(), children.end(), [seen](const auto &thm) { return seen.contains(thm); })) {
-            kill_tactic(mcts_node, tactic_id);
+            kill_tactic(HTPS_node, tactic_id);
             cleanup(sim);
             find_unexplored_and_propagate_expandable();
             throw FailedTacticException();
         }
-        mcts_node.add_virtual_count(tactic_id, params.virtual_loss);
+        HTPS_node.add_virtual_count(tactic_id, params.virtual_loss);
         sim.set_virtual_count_added(current, true);
         for (const auto &child: children) {
             sim.add_theorem(child, current, sim.get_depth(current) + 1);
@@ -748,9 +753,11 @@ Simulation MCTS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
     return sim;
 }
 
-void MCTS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved) {
+void HTPS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved) {
     // has to be log value
     assert(value <= 0);
+    if(!simulations_for_theorem.contains(thm))
+        throw std::runtime_error("No simulation for theorem");
     for (const auto &simulation: simulations_for_theorem.at(thm)) {
         simulation->receive_expansion(thm, value, solved);
     }
@@ -758,12 +765,12 @@ void MCTS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool s
     currently_expanding.erase(thm);
 }
 
-void MCTS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
-    std::vector<MCTSNode> nodes;
+void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
+    std::vector<HTPSNode> nodes;
 
     for (const auto &expansion: expansions) {
         if (expansion->is_error()) {
-            MCTSNode current = MCTSNode(
+            HTPSNode current = HTPSNode(
                     expansion->thm, {}, {}, policy, {}, params.exploration, MIN_FLOAT,
                     params.q_value_solved, params.tactic_init_value, expansion->effects);
             receive_expansion(expansion->thm, MIN_FLOAT, false);
@@ -785,14 +792,14 @@ void MCTS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
                                    return tactic->is_valid;
                                }));
             // Solved gets value 1, i.e. log value 0
-            MCTSNode current = MCTSNode(
+            HTPSNode current = HTPSNode(
                     expansion->thm, expansion->tactics, expansion->children_for_tactic, policy, expansion->priors,
                     params.exploration, 0.0, params.q_value_solved, params.tactic_init_value, expansion->effects);
             receive_expansion(expansion->thm, 0.0, true);
             nodes.push_back(current);
             continue;
         }
-        MCTSNode current = MCTSNode(
+        HTPSNode current = HTPSNode(
                 expansion->thm, expansion->tactics, expansion->children_for_tactic, policy, expansion->priors,
                 params.exploration, expansion->log_critic, params.q_value_solved, params.tactic_init_value,
                 expansion->effects);
@@ -803,8 +810,8 @@ void MCTS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
     expansion_count += 1;
 }
 
-void MCTS::cleanup(Simulation &to_clean) {
-    MCTSNode current;
+void HTPS::cleanup(Simulation &to_clean) {
+    HTPSNode current;
     for (const auto &[unique_str, thm]: to_clean) {
         if (!nodes.contains(thm))
             continue;
@@ -815,7 +822,7 @@ void MCTS::cleanup(Simulation &to_clean) {
     }
 }
 
-void MCTS::backup() {
+void HTPS::backup() {
     bool only_value;
     long i = 0;
     while (i < simulations.size()) {
@@ -837,14 +844,14 @@ void MCTS::backup() {
     }
 }
 
-void MCTS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
+void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
     auto leaves = sim->leaves();
     bool updated_root = false;
     std::queue<std::shared_ptr<theorem>> to_process;
 
     TheoremMap<size_t> children_propagated;
     for (const auto &leaf: leaves) {
-        MCTSNode current = nodes.at(leaf);
+        HTPSNode current = nodes.at(leaf);
         if (sim->get_virtual_count_added(leaf)) {
             current.subtract_virtual_count(sim->get_tactic_id(leaf), params.virtual_loss);
         }
@@ -871,7 +878,7 @@ void MCTS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
         std::vector<double> child_values = sim->child_values(cur);
         assert(std::all_of(child_values.begin(), child_values.end(), [](const auto &v) { return v <= 0; }));
         double sum_log = std::accumulate(child_values.begin(), child_values.end(), 0.0);
-        MCTSNode current_node = nodes.at(cur);
+        HTPSNode current_node = nodes.at(cur);
         if (current_node.is_solved() && params.backup_one_for_solved) {
             sum_log = 0.0;
         }
@@ -898,7 +905,7 @@ void MCTS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
     assert(updated_root);
 }
 
-void MCTS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
     propagate_needed = false;
     TheoremMap<std::shared_ptr<theorem>> result;
     theorems.clear();
@@ -927,7 +934,7 @@ void MCTS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
     }
 }
 
-void MCTS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
+void HTPS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
                              std::vector<std::shared_ptr<theorem>> &leaves_to_expand) {
     theorems.clear();
     TheoremSet seen;
@@ -950,13 +957,13 @@ void MCTS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Si
     }
 }
 
-std::vector<std::shared_ptr<theorem>> MCTS::batch_to_expand() {
+std::vector<std::shared_ptr<theorem>> HTPS::batch_to_expand() {
     std::vector<std::shared_ptr<theorem>> theorems;
     batch_to_expand(theorems);
     return theorems;
 }
 
-void MCTS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions) {
+void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions) {
     expand(expansions);
     backup();
 
@@ -978,12 +985,53 @@ void MCTS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
     }
     assert(nodes.size() == expansion_count); // not sure whether this is correct
     done = done || (expansion_count >= params.num_expansions);
-    if (!done)
-        mcts_move();
+//    if (!done)
+//        HTPS_move();
 }
 
-void MCTS::mcts_move() {
-
+void HTPS::theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+    return batch_to_expand(theorems);
 }
 
+std::vector<std::shared_ptr<theorem>> HTPS::theorems_to_expand() {
+    std::vector<std::shared_ptr<theorem>> theorems;
+    theorems_to_expand(theorems);
+    return theorems;
+}
+
+HTPSResult HTPS::get_result() {
+    check_solved_consistency();
+    for (const auto &[thm, node]: nodes) {
+        assert(!node.has_virtual_count());
+    }
+    build_in_proof();
+    get_node_proof_sizes_and_depths();
+    struct proof p;
+    if (is_proven()) {
+        for (size_t i = 0; i < METRIC_COUNT; i++) {
+            assert(minimum_proof_size.has_value(static_cast<Metric>(i)));
+        }
+        p = minimal_proof(params.metric, root);
+    }
+    std::vector<HTPSSampleEffect> samples_effects;
+    std::vector<HTPSSampleCritic> samples_critic;
+    std::vector<HTPSSampleTactics> samples_tactics;
+    get_train_samples(samples_effects, samples_critic, samples_tactics);
+    std::vector<HTPSSampleTactics> proof_samples_tactics;
+    get_proof_samples(proof_samples_tactics);
+    return {samples_critic, samples_tactics, samples_effects, params.metric, proof_samples_tactics, root, p};
+}
+
+struct proof HTPSResult::get_proof() const {
+    return p;
+}
+
+std::shared_ptr<theorem> HTPSResult::get_goal() const {
+    return goal;
+}
+
+std::tuple<std::vector<HTPSSampleCritic>, std::vector<HTPSSampleTactics>, std::vector<HTPSSampleEffect>, Metric, std::vector<HTPSSampleTactics>>
+HTPSResult::get_samples() const {
+    return {samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics};
+}
 

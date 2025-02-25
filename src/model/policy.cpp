@@ -18,7 +18,7 @@ constexpr double TOLERANCE = 1e-3;
 constexpr double EPSILON = 1e-10;
 
 void Policy::get_policy(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                        const std::vector<size_t> counts, std::vector<double> &result) const {
+                        const std::vector<size_t> &counts, std::vector<double> &result) const {
     size_t valid_count = 0;
     result.clear();
     result.reserve(q_values.size());
@@ -54,10 +54,10 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
 
 
 void Policy::alpha_zero(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                        const std::vector<size_t> counts, std::vector<double> &result) const {
+                        const std::vector<size_t> &counts, std::vector<double> &result) const {
     std::vector<double> scores(q_values.size());
     result.reserve(q_values.size());
-    double count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), 0));
+    auto count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0)));
     std::vector<double> counts_d(counts.begin(), counts.end());
     double score_sum = 0;
     for (size_t i = 0; i < q_values.size(); i++) {
@@ -74,7 +74,7 @@ void Policy::alpha_zero(const std::vector<double> &q_values, const std::vector<d
 }
 
 double Policy::find_rpo_alpha(double alpha_min, double alpha_max, const std::vector<double> &q_values,
-                              const std::vector<double> &scaled_pi_values) const {
+                              const std::vector<double> &scaled_pi_values) {
     double alpha_mid;
     double pi_difference_sum;
     double diff;
@@ -103,10 +103,10 @@ double Policy::find_rpo_alpha(double alpha_min, double alpha_max, const std::vec
 
 
 void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<double> &pi_values,
-                      const std::vector<size_t> counts, std::vector<double> &result) const {
+                      const std::vector<size_t> &counts, std::vector<double> &result) const {
     result.reserve(q_values.size());
-    double count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), 0));
-    double multiplier = std::sqrt(count_sum) / (count_sum + counts.size()) * exploration;
+    auto count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0)));
+    double multiplier = std::sqrt(count_sum) / (count_sum + static_cast<double>(counts.size())) * exploration;
     if (multiplier <= 0) {
         double q_sum = 0;
         for (size_t i = 0; i < q_values.size(); i++) {

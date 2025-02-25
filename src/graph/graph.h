@@ -404,7 +404,6 @@ namespace htps {
         bool is_in_minimum_proof(Metric metric) const {
             return in_minimum_proof.get(metric);
         }
-
     };
 }
 
@@ -421,7 +420,7 @@ namespace htps {
      * */
     class PrioritizedNode {
     public:
-        std::shared_ptr<Node> node;
+        Node* node;
         size_t priority;
         size_t tactic_id;
 
@@ -571,7 +570,7 @@ namespace htps {
 
         void insert(const std::shared_ptr<theorem> &thm, const T &t) {
             if (!thm)
-                insert("", t);
+                return insert("", t);
             insert(*thm, t);
         }
 
@@ -744,6 +743,9 @@ namespace htps {
         // Add an ancestor relationship
         void
         add_ancestor(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+            if (!contains(thm)) {
+                insert(thm, AncestorSet());
+            }
             at(thm).insert(parent, tactic_id);
         }
 
@@ -854,7 +856,7 @@ namespace htps {
             std::vector<T> newly_solved;
             for (auto &node: node_list) {
                 std::shared_ptr<theorem> th = node.get_theorem();
-                if (!ancestors.contains(th) || permanent_ancestors.contains(th)) {
+                if (!ancestors.contains(th) || !permanent_ancestors.contains(th)) {
                     throw std::invalid_argument("Invalid node");
                 }
                 if (nodes.contains(th)) {
@@ -1076,7 +1078,7 @@ namespace htps {
 
         // A sanity check to assert that each node is solved if there is any tactic that solves all children
         void check_solved_consistency() const {
-            bool solved_requires_tactic = std::all_of(nodes.begin(), nodes.end(), [this](const auto &pair) {
+            bool solved_requires_tactic = std::all_of(nodes.begin(), nodes.end(), [](const auto &pair) {
                 const auto &node = pair.second;
                 return node.is_solved() == (node.n_solving_tactics() > 0);
             });
@@ -1122,6 +1124,7 @@ namespace htps {
             }
             TheoremSet seen;
             std::deque<std::shared_ptr<theorem>> to_visit;
+            to_visit.push_back(root);
             while (!to_visit.empty()) {
                 std::shared_ptr<theorem> current = to_visit.front();
                 to_visit.pop_front();
@@ -1159,11 +1162,11 @@ namespace htps {
             }
         }
 
-        struct proof minimal_proof(Metric metric, theorem &thm) {
+        struct proof minimal_proof(Metric metric, const std::shared_ptr<theorem> &thm) const {
             if (!nodes.contains(thm)) {
                 throw std::invalid_argument("Theorem not found");
             }
-            T &node = nodes.at(thm);
+            const T &node = nodes.at(thm);
             if (!node.is_solved()) {
                 throw std::invalid_argument("Theorem not solved");
             }
@@ -1175,7 +1178,7 @@ namespace htps {
             for (const auto &child: node.get_children_for_tactic(min_tac)) {
                 proofs.push_back(minimal_proof(metric, child));
             }
-            return {thm, node.tactics[min_tac], proofs};
+            return {thm, node.get_tactic(min_tac), proofs};
         }
 
         /* Get minimal proof sizes for all nodes in the graph

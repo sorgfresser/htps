@@ -48,7 +48,8 @@ namespace htps {
         }
 
         bool has_value() const {
-            return std::any_of(minimum_length.begin(), minimum_length.end(), [](size_t v) { return v != MAXIMUM_PROOF_LENGTH; });
+            return std::any_of(minimum_length.begin(), minimum_length.end(),
+                               [](size_t v) { return v != MAXIMUM_PROOF_LENGTH; });
         }
 
         // Print all values
@@ -432,6 +433,175 @@ namespace htps {
         }
     };
 
+
+    class TheoremSet {
+    private:
+        std::unordered_set<std::string> _set;
+    public:
+        auto begin() const noexcept {
+            return _set.begin();
+        }
+
+        auto begin() noexcept {
+            return _set.begin();
+        }
+
+        auto end() const noexcept {
+            return _set.end();
+        }
+
+        auto end() noexcept {
+            return _set.end();
+        }
+
+        bool contains(const std::string &s) const {
+            return _set.contains(s);
+        }
+
+        bool contains(const theorem &thm) const {
+            return contains(thm.unique_string);
+        }
+
+        bool contains(const std::shared_ptr<theorem> &thm) const {
+            return contains(*thm);
+        }
+
+        void insert(const std::string &s) {
+            _set.insert(s);
+        }
+
+        void insert(const theorem &thm) {
+            insert(thm.unique_string);
+        }
+
+        void insert(const std::shared_ptr<theorem> &thm) {
+            insert(*thm);
+        }
+
+        bool erase(const std::string &s) {
+            return _set.erase(s) > 0;
+        }
+
+        bool erase(const theorem &thm) {
+            return erase(thm.unique_string);
+        }
+
+        bool erase(const std::shared_ptr<theorem> &thm) {
+            return erase(*thm);
+        }
+
+        size_t size() const {
+            return _set.size();
+        }
+
+        auto find(const std::string &s) const {
+            return _set.find(s);
+        }
+
+        auto find(const theorem &thm) const {
+            return find(thm.unique_string);
+        }
+
+        auto find(const std::shared_ptr<theorem> &thm) const {
+            return find(*thm);
+        }
+
+        void clear() {
+            _set.clear();
+        }
+
+        auto empty() const {
+            return _set.empty();
+        }
+    };
+
+    struct PairHash {
+        template<typename T>
+        std::size_t operator()(const std::pair<std::string, T> &p) const {
+            std::size_t h1 = std::hash<std::string>{}(p.first);
+            std::size_t h2 = std::hash<T>{}(p.second);
+            // Combine the two hash values.
+            return h1 ^ (h2 << 1);  // simple combination; you can choose a different method if needed.
+        }
+    };
+
+    template
+            <typename T>
+    class TheoremPairSet {
+    private:
+        std::unordered_set<std::pair<std::string, T>, PairHash> _set;
+    public:
+        auto begin() const noexcept {
+            return _set.begin();
+        }
+
+        auto begin() noexcept {
+            return _set.begin();
+        }
+
+        auto end() const noexcept {
+            return _set.end();
+        }
+
+        auto end() noexcept {
+            return _set.end();
+        }
+
+        bool contains(const std::string &s, const T &t) const {
+            return _set.contains(std::make_pair(s, t));
+        }
+
+        bool contains(const theorem &thm, const T &t) const {
+            return contains(thm.unique_string, t);
+        }
+
+        bool contains(const std::shared_ptr<theorem> &thm, const T &t) const {
+            if (!thm)
+                return contains("", t);
+            return contains(*thm, t);
+        }
+
+        void insert(const std::string &s, const T &t) {
+            _set.insert(std::make_pair(s, t));
+        }
+
+        void insert(const theorem &thm, const T &t) {
+            insert(thm.unique_string, t);
+        }
+
+        void insert(const std::shared_ptr<theorem> &thm, const T &t) {
+            if (!thm)
+                insert("", t);
+            insert(*thm, t);
+        }
+
+        bool erase(const std::string &s, const T &t) {
+            return _set.erase(std::make_pair(s, t)) > 0;
+        }
+
+        bool erase(const theorem &thm, const T &t) {
+            return erase(thm.unique_string, t);
+        }
+
+        bool erase(const std::shared_ptr<theorem> &thm, const T &t) {
+            if (!thm)
+                return erase("", t);
+            return erase(*thm, t);
+        }
+
+        size_t size() const {
+            return _set.size();
+        }
+
+        void clear() {
+            _set.clear();
+        }
+
+        auto empty() const {
+            return _set.empty();
+        }
+    };
+
     // Map a theorem to type T
     template<typename T>
     class TheoremMap {
@@ -554,13 +724,13 @@ namespace htps {
             set(*thm, t);
         }
 
-        bool empty() const noexcept{
+        bool empty() const noexcept {
             return _map.empty();
         }
     };
 
 
-    using AncestorSet = std::unordered_set<std::pair<std::shared_ptr<struct theorem>, size_t>>;
+    using AncestorSet = TheoremPairSet<size_t>;
 
     class AncestorsMap : public TheoremMap<AncestorSet> {
     public:
@@ -574,7 +744,7 @@ namespace htps {
         // Add an ancestor relationship
         void
         add_ancestor(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
-            at(thm).insert(std::make_pair(parent, tactic_id));
+            at(thm).insert(parent, tactic_id);
         }
 
         // Get ancestors for a theorem
@@ -598,11 +768,7 @@ namespace htps {
             for (const auto &[thm, ancestor_set]: _map) {
                 std::cout << "Theorem string: " << thm << '\n';
                 for (const auto &[parent, tactic_id]: ancestor_set) {
-                    if (parent) {
-                        std::cout << "(Parent: " << parent->unique_string << ", Tactic ID: " << tactic_id << ") ";
-                    } else {
-                        std::cout << "(Parent: None, Tactic ID: " << tactic_id << ") ";
-                    }
+                    std::cout << "(Parent: " << parent << ", Tactic ID: " << tactic_id << ") ";
                 }
                 std::cout << '\n';
             }
@@ -612,7 +778,7 @@ namespace htps {
             if (!contains(thm)) {
                 return false;
             }
-            return get_ancestors(thm).contains({parent, tactic_id});
+            return get_ancestors(thm).contains(parent, tactic_id);
         }
 
         bool contains(const theorem &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
@@ -639,92 +805,11 @@ namespace htps {
             if (!contains(thm)) {
                 return false;
             }
-            return at(thm).erase({parent, tactic_id}) > 0;
+            return at(thm).erase(parent, tactic_id);
         }
 
         bool erase(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
             return erase(*thm, parent, tactic_id);
-        }
-    };
-
-    class TheoremSet {
-    private:
-        std::unordered_set<std::string> _set;
-    public:
-        auto begin() const noexcept {
-            return _set.begin();
-        }
-
-        auto begin() noexcept {
-            return _set.begin();
-        }
-
-        auto end() const noexcept {
-            return _set.end();
-        }
-
-        auto end() noexcept {
-            return _set.end();
-        }
-
-        bool contains(const std::string &s) const {
-            return _set.contains(s);
-        }
-
-        bool contains(const theorem &thm) const {
-            return contains(thm.unique_string);
-        }
-
-        bool contains(const std::shared_ptr<theorem> &thm) const {
-            return contains(*thm);
-        }
-
-        void insert(const std::string &s) {
-            _set.insert(s);
-        }
-
-        void insert(const theorem &thm) {
-            insert(thm.unique_string);
-        }
-
-        void insert(const std::shared_ptr<theorem> &thm) {
-            insert(*thm);
-        }
-
-        bool erase(const std::string &s) {
-            return _set.erase(s) > 0;
-        }
-
-        bool erase(const theorem &thm) {
-            return erase(thm.unique_string);
-        }
-
-        bool erase(const std::shared_ptr<theorem> &thm) {
-            return erase(*thm);
-        }
-
-        size_t size() const {
-            return _set.size();
-        }
-
-        auto find(const std::string &s) const {
-            return _set.find(s);
-        }
-
-        auto find(const theorem &thm) const {
-            return find(thm.unique_string);
-        }
-
-        auto find(const std::shared_ptr<theorem> &thm) const {
-            return find(*thm);
-        }
-
-        void clear() {
-            _set.clear();
-        }
-
-        auto empty() const {
-            return _set.empty();
         }
     };
 
@@ -742,8 +827,8 @@ namespace htps {
 
     public:
         explicit Graph(std::shared_ptr<theorem> &root) : root(root), nodes(), ancestors(), permanent_ancestors(),
-                                                unexplored_theorems(),
-                                                minimum_proof_size(), initial_minimum_proof_size() {
+                                                         unexplored_theorems(),
+                                                         minimum_proof_size(), initial_minimum_proof_size() {
             ancestors.add_ancestor(root, nullptr, 0);
             permanent_ancestors.add_ancestor(root, nullptr, 0);
             unexplored_theorems.insert(*root);
@@ -778,7 +863,7 @@ namespace htps {
                 nodes.set(th, node);
                 if (node.is_bad()) {
                     for (const auto &[parent_th, tactic_id]: ancestors.get_ancestors(th)) {
-                        if (parent_th) {
+                        if (!parent_th.empty()) {
                             nodes.at(parent_th).kill_tactic(tactic_id);
                         }
                     }
@@ -791,10 +876,10 @@ namespace htps {
 
                 std::unordered_set<size_t> bad_tactic_ids;
                 auto children_for_tactic = node.get_children_for_tactic();
-                for (size_t i= 0; i < children_for_tactic.size(); i++) {
+                for (size_t i = 0; i < children_for_tactic.size(); i++) {
                     auto children = children_for_tactic[i];
                     for (const auto &child: children) {
-                        permanent_ancestors.add_ancestor(child, th,i);
+                        permanent_ancestors.add_ancestor(child, th, i);
                         if (nodes.contains(child) && nodes.at(child).is_bad()) {
                             bad_tactic_ids.insert(i);
                         }
@@ -818,7 +903,7 @@ namespace htps {
                     continue;
                 }
                 thm = current.get_theorem();
-                for (const auto child: current.get_children_for_tactic(tid)) {
+                for (const auto &child: current.get_children_for_tactic(tid)) {
                     if (ancestors.contains(child, thm, tid)) {
                         ancestors.erase(child, thm, tid);
                         if (!ancestors.size(child)) {
@@ -833,7 +918,7 @@ namespace htps {
                 // Since this node has become bad.
                 if (current.kill_tactic(tid)) {
                     for (const auto &[parent, parent_tid]: ancestors.get_ancestors(thm)) {
-                        if (parent) {
+                        if (!parent.empty()) {
                             to_kill.push_front({nodes.at(parent), parent_tid});
                         }
                     }
@@ -884,10 +969,10 @@ namespace htps {
             for (auto &[thm, node]: nodes) {
                 node.set_expandable(false);
             }
-            std::vector<std::shared_ptr<theorem>> to_propagate;
+            std::vector<std::string> to_propagate;
             for (const auto &thm: unexplored_theorems) {
                 for (const auto &[parent, tactic_id]: ancestors.get_ancestors(thm)) {
-                    if (!parent) {
+                    if (parent.empty()) {
                         continue;
                     }
                     T &node = nodes.at(parent);
@@ -898,17 +983,17 @@ namespace htps {
                     to_propagate.push_back(parent);
                 }
             }
-            std::deque<std::shared_ptr<theorem>> propagate_queue(to_propagate.begin(), to_propagate.end());
+            std::deque<std::string> propagate_queue(to_propagate.begin(), to_propagate.end());
             TheoremSet seen;
             while (!propagate_queue.empty()) {
-                std::shared_ptr<theorem> current = propagate_queue.front();
+                std::string current = propagate_queue.front();
                 propagate_queue.pop_front();
-                if (seen.contains(*current)) {
+                if (seen.contains(current)) {
                     continue;
                 }
-                seen.insert(*current);
+                seen.insert(current);
                 for (const auto &[parent, tactic_id]: ancestors.get_ancestors(current)) {
-                    if (!parent) {
+                    if (parent.empty()) {
                         continue;
                     }
                     T &node = nodes.at(parent);
@@ -968,7 +1053,7 @@ namespace htps {
                     newly_solved_deque.pop_front();
                     assert(node.is_solved());
                     for (const auto &[parent, tactic_id]: permanent_ancestors.get_ancestors(node.get_theorem())) {
-                        if (!parent) {
+                        if (parent.empty()) {
                             continue;
                         }
                         to_check.push_back({nodes.at(parent), tactic_id});
@@ -993,34 +1078,34 @@ namespace htps {
         void check_solved_consistency() const {
             bool solved_requires_tactic = std::all_of(nodes.begin(), nodes.end(), [this](const auto &pair) {
                 const auto &node = pair.second;
-                return node.is_solved() == (node.n_solving_tactics > 0);
+                return node.is_solved() == (node.n_solving_tactics() > 0);
             });
             if (!solved_requires_tactic) {
                 throw std::runtime_error(
                         "Solved consistency check failed, at least one node is solved without a solving tactic or vice versa");
             }
             for (const auto &[thm, node]: nodes) {
-                for (const auto &[tactic_id, children]: node.get_children_for_tactic()) {
+                const auto &children_for_tactic = node.get_children_for_tactic();
+                for (size_t tactic_id = 0; tactic_id < children_for_tactic.size(); tactic_id++) {
+                    const auto &children = children_for_tactic[tactic_id];
                     for (const auto &child: children) {
                         if (node.killed(tactic_id))
                             continue;
-                        if (!ancestors.get_ancestors(child).contains({thm, tactic_id})) {
+                        if (!ancestors.get_ancestors(child).contains(thm, tactic_id)) {
                             throw std::runtime_error("Ancestor consistency check failed, ancestor not found");
                         }
                     }
                 }
             }
             for (const auto &[_, node]: nodes) {
-                bool should_be_solved = std::any_of(node.get_children_for_tactic().begin(),
-                                                    node.get_children_for_tactic().end(),
-                                                    [this, node](const auto &pair) {
-                                                        const auto &[tactic_id, children] = pair;
-                                                        return std::all_of(children.begin(), children.end(),
-                                                                           [this](const theorem &thm) {
-                                                                               return nodes.contains(thm) &&
-                                                                                      nodes.at(thm).is_solved();
-                                                                           }) && node.is_valid(tactic_id);
-                                                    });
+                bool should_be_solved = false;
+                const auto &children_for_tactic = node.get_children_for_tactic();
+                for (size_t tactic_id = 0; tactic_id < children_for_tactic.size(); tactic_id++) {
+                    const auto &children = children_for_tactic[tactic_id];
+                    should_be_solved |= std::all_of(children.begin(), children.end(), [this](const std::shared_ptr<theorem> &thm) {
+                        return nodes.contains(thm) && nodes.at(thm).is_solved();
+                    }) && node.is_valid(tactic_id);
+                }
                 if (should_be_solved != node.is_solved()) {
                     throw std::runtime_error(
                             "Solved consistency check failed, node should be solved but is not or vice versa");
@@ -1133,7 +1218,7 @@ namespace htps {
                     // Also for each parent, if all children have a minimum (i.e. are all solved)
                     // Then propagate the minimum length to the parent
                     for (const auto &[parent, parent_tactic]: permanent_ancestors.get_ancestors(node->get_theorem())) {
-                        if (!parent) {
+                        if (parent.empty()) {
                             continue;
                         }
                         T &parent_node = nodes.at(parent);

@@ -169,13 +169,25 @@ void Simulation::set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet
     seen.insert_or_assign(thm, set);
 }
 
+void Simulation::set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet set) {
+    seen.insert_or_assign(thm, set);
+}
+
 TheoremSet &Simulation::get_theorem_set(const std::shared_ptr<theorem> &thm) {
+    if (!seen.contains(thm))
+        set_theorem_set(thm, TheoremSet());
     return seen.at(thm);
 }
 
 void
 Simulation::add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t thm_depth) {
     assert(theorems.contains(parent));
+    assert(!theorems.contains(thm));
+    assert(!depth.contains(thm));
+    assert(!seen.contains(thm));
+    assert(!children_for_theorem.contains(thm));
+    assert(!parent_for_theorem.contains(thm));
+    assert(!virtual_count_added.contains(thm));
     theorems.insert_or_assign(thm, thm);
     depth.insert_or_assign(thm, thm_depth);
     auto seen_set = seen.at(parent);
@@ -183,6 +195,8 @@ Simulation::add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_p
     seen.insert_or_assign(thm, seen_set);
     children_for_theorem.at(parent).push_back(thm);
     parent_for_theorem.insert_or_assign(thm, parent);
+    children_for_theorem.insert_or_assign(thm, std::vector<std::shared_ptr<theorem>>());
+    virtual_count_added.insert_or_assign(thm, false);
 }
 
 size_t Simulation::leave_count() const {
@@ -591,8 +605,8 @@ std::size_t std::hash<HTPSNode>::operator()(const HTPSNode &n) const {
     return std::hash<theorem>()(*n.get_theorem());
 }
 
-bool HTPS::is_leaf(const htps::HTPSNode &node) const {
-    return node.is_solved() && !(is_proven()) && (params.early_stopping_solved_if_root_not_proven);
+bool HTPS::is_leaf(const std::shared_ptr<htps::HTPSNode> &node) const {
+    return node->is_solved() && !(is_proven()) && (params.early_stopping_solved_if_root_not_proven);
 }
 
 void HTPS::find_unexplored_and_propagate_expandable() {
@@ -603,7 +617,7 @@ void HTPS::find_unexplored_and_propagate_expandable() {
 }
 
 bool HTPS::dead_root() const {
-    return (propagate_needed && unexplored_theorems.empty()) || (nodes.contains(root) && nodes.at(root).is_bad());
+    return (propagate_needed && unexplored_theorems.empty()) || (nodes.contains(root) && nodes.at(root)->is_bad());
 }
 
 void
@@ -627,18 +641,18 @@ HTPS::get_train_samples(std::vector<HTPSSampleEffect> &samples_effects, std::vec
     }
 
     for (const auto &[thm, node]: nodes) {
-        node.get_effect_samples(node_samples, params.effect_subsampling_rate);
+        node->get_effect_samples(node_samples, params.effect_subsampling_rate);
         samples_effects.insert(samples_effects.end(), node_samples.begin(), node_samples.end());
         node_samples.clear();
-        auto critic_sample = node.get_critic_sample(params.critic_subsampling_rate);
+        auto critic_sample = node->get_critic_sample(params.critic_subsampling_rate);
         if (critic_sample) {
-            if (node.is_solved()) {
+            if (node->is_solved()) {
                 critic_solved.push_back(critic_sample.value());
             } else {
                 critic_unsolved.push_back(critic_sample.value());
             }
         }
-        auto tactic_sample = node.get_tactics_sample(params.metric, node_mask, params.only_learn_best_tactics,
+        auto tactic_sample = node->get_tactics_sample(params.metric, node_mask, params.only_learn_best_tactics,
                                                      params.tactic_p_threshold, params.count_threshold,
                                                      params.tactic_sample_q_conditioning);
         if (tactic_sample) {
@@ -658,7 +672,7 @@ void HTPS::get_proof_samples(std::vector<HTPSSampleTactics> &proof_samples_tacti
     // Upper bound on the number of samples
     proof_samples_tactics.reserve(nodes.size());
     for (const auto &[thm, node]: nodes) {
-        auto tactic_sample = node.get_tactics_sample(params.metric, MinimalProof, params.only_learn_best_tactics,
+        auto tactic_sample = node->get_tactics_sample(params.metric, MinimalProof, params.only_learn_best_tactics,
                                                      params.tactic_p_threshold, params.count_threshold,
                                                      params.tactic_sample_q_conditioning);
         if (tactic_sample) {
@@ -686,21 +700,21 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         }
         auto HTPS_node = nodes.at(current);
         bool is_leaf_node = is_leaf(HTPS_node);
-        if (HTPS_node.is_terminal() || is_leaf_node) {
-            assert(HTPS_node.is_solved() || is_leaf_node);
-            sim.set_value(current, HTPS_node.get_value());
+        if (HTPS_node->is_terminal() || is_leaf_node) {
+            assert(HTPS_node->is_solved() || is_leaf_node);
+            sim.set_value(current, HTPS_node->get_value());
             sim.set_solved(current, true);
             terminal.push_back(current);
             continue;
         }
-        if (params.early_stopping && HTPS_node.is_solved()) {
+        if (params.early_stopping && HTPS_node->is_solved()) {
             sim.set_value(current, 0.0);
             sim.set_solved(current, true);
             terminal.push_back(current);
             continue;
         }
         // Select subsequent tactic
-        HTPS_node.compute_policy(node_policy, true);
+        HTPS_node->compute_policy(node_policy, true);
         size_t tactic_id;
         if (params.policy_temperature == 0) {
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
@@ -718,11 +732,11 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             std::discrete_distribution<size_t> dist(node_policy.begin(), node_policy.end());
             tactic_id = dist(gen);
         }
-        assert(!HTPS_node.killed(tactic_id));
-        auto tactic_ptr = HTPS_node.get_tactic(tactic_id);
+        assert(!HTPS_node->killed(tactic_id));
+        auto tactic_ptr = HTPS_node->get_tactic(tactic_id);
         sim.set_tactic(current, tactic_ptr);
         sim.set_tactic_id(current, tactic_id);
-        auto children = HTPS_node.get_children_for_tactic(tactic_id);
+        auto children = HTPS_node->get_children_for_tactic(tactic_id);
         TheoremSet &seen = sim.get_theorem_set(current);
         // If any child has been seen, we have a circle, i.e. kill the tactic
         if (std::any_of(children.begin(), children.end(), [seen](const auto &thm) { return seen.contains(thm); })) {
@@ -731,7 +745,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             find_unexplored_and_propagate_expandable();
             throw FailedTacticException();
         }
-        HTPS_node.add_virtual_count(tactic_id, params.virtual_loss);
+        HTPS_node->add_virtual_count(tactic_id, params.virtual_loss);
         sim.set_virtual_count_added(current, true);
         for (const auto &child: children) {
             sim.add_theorem(child, current, sim.get_depth(current) + 1);
@@ -741,8 +755,8 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         sim.erase_theorem_set(current);
     }
 
-    std::vector<std::shared_ptr<theorem>> all_leaves = sim.leaves();
-    all_leaves.insert(all_leaves.end(), terminal.begin(), terminal.end());
+    std::vector<std::shared_ptr<theorem>> all_leaves = terminal;
+    all_leaves.insert(all_leaves.end(), to_expand.begin(), to_expand.end());
     assert(!all_leaves.empty());
     assert(std::all_of(to_expand.begin(), to_expand.end(),
                        [this](const auto &thm) { return !this->nodes.contains(thm); }));
@@ -756,7 +770,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
 void HTPS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved) {
     // has to be log value
     assert(value <= 0);
-    if(!simulations_for_theorem.contains(thm))
+    if (!simulations_for_theorem.contains(thm))
         throw std::runtime_error("No simulation for theorem");
     for (const auto &simulation: simulations_for_theorem.at(thm)) {
         simulation->receive_expansion(thm, value, solved);
@@ -807,17 +821,17 @@ void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
         nodes.push_back(current);
     }
     add_nodes(nodes);
-    expansion_count += 1;
+    expansion_count += nodes.size();
 }
 
 void HTPS::cleanup(Simulation &to_clean) {
-    HTPSNode current;
+    std::shared_ptr<HTPSNode> current;
     for (const auto &[unique_str, thm]: to_clean) {
         if (!nodes.contains(thm))
             continue;
         current = nodes.at(thm);
         if (to_clean.get_virtual_count_added(thm)) {
-            current.subtract_virtual_count(to_clean.get_tactic_id(thm), params.virtual_loss);
+            current->subtract_virtual_count(to_clean.get_tactic_id(thm), params.virtual_loss);
         }
     }
 }
@@ -851,9 +865,9 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
 
     TheoremMap<size_t> children_propagated;
     for (const auto &leaf: leaves) {
-        HTPSNode current = nodes.at(leaf);
+        std::shared_ptr<HTPSNode> current = nodes.at(leaf);
         if (sim->get_virtual_count_added(leaf)) {
-            current.subtract_virtual_count(sim->get_tactic_id(leaf), params.virtual_loss);
+            current->subtract_virtual_count(sim->get_tactic_id(leaf), params.virtual_loss);
         }
         assert(sim->get_value(leaf) <= 0); // log
         auto parent = sim->parent(leaf);
@@ -878,8 +892,8 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
         std::vector<double> child_values = sim->child_values(cur);
         assert(std::all_of(child_values.begin(), child_values.end(), [](const auto &v) { return v <= 0; }));
         double sum_log = std::accumulate(child_values.begin(), child_values.end(), 0.0);
-        HTPSNode current_node = nodes.at(cur);
-        if (current_node.is_solved() && params.backup_one_for_solved) {
+        std::shared_ptr<HTPSNode> current_node = nodes.at(cur);
+        if (current_node->is_solved() && params.backup_one_for_solved) {
             sum_log = 0.0;
         }
         if (params.depth_penalty < 1) {
@@ -888,10 +902,10 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
         assert(sum_log <= 0);
         sim->set_value(cur, sum_log);
         if (sim->get_virtual_count_added(cur)) {
-            current_node.subtract_virtual_count(sim->get_tactic_id(cur), params.virtual_loss);
+            current_node->subtract_virtual_count(sim->get_tactic_id(cur), params.virtual_loss);
         }
         if (!only_value) {
-            current_node.update(sim->get_tactic_id(cur), sum_log);
+            current_node->update(sim->get_tactic_id(cur), sum_log);
         }
         if (!sim->parent(cur)) {
             updated_root = true;
@@ -968,14 +982,14 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
     backup();
 
     assert(std::none_of(nodes.begin(), nodes.end(), [](const auto &node) {
-        return node.second.has_virtual_count();
+        return node.second->has_virtual_count();
     }));
     if (is_proven() && !initial_minimum_proof_size.has_value()) {
         build_in_proof();
         get_node_proof_sizes_and_depths();
         for (size_t i = 0; i < METRIC_COUNT; i++) {
             initial_minimum_proof_size.set(static_cast<Metric>(i),
-                                           nodes.at(root).minimum_length(static_cast<Metric>(i)));
+                                           nodes.at(root)->minimum_length(static_cast<Metric>(i)));
             assert(initial_minimum_proof_size.has_value(static_cast<Metric>(i)));
         }
         reset_minimum_proof_stats();
@@ -1002,7 +1016,7 @@ std::vector<std::shared_ptr<theorem>> HTPS::theorems_to_expand() {
 HTPSResult HTPS::get_result() {
     check_solved_consistency();
     for (const auto &[thm, node]: nodes) {
-        assert(!node.has_virtual_count());
+        assert(!node->has_virtual_count());
     }
     build_in_proof();
     get_node_proof_sizes_and_depths();

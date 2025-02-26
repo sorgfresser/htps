@@ -220,6 +220,8 @@ namespace htps {
 
         void set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet &set);
 
+        void set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet set);
+
         TheoremSet &get_theorem_set(const std::shared_ptr<theorem> &thm);
 
         void add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t thm_depth);
@@ -450,7 +452,7 @@ namespace htps {
                                std::vector<std::shared_ptr<theorem>> &leaves_to_expand);
 
     protected:
-        bool is_leaf(const HTPSNode &node) const;
+        bool is_leaf(const std::shared_ptr<HTPSNode> &node) const;
 
         /* Upon receiving an expansion which we add to the graph, we need to update the HTPS statistics.
          * For this, the value is set in each Simulation that still has the theorem in its

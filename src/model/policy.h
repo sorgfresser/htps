@@ -23,7 +23,7 @@ namespace htps {
         double exploration;
 
     public:
-         /* Get the policy for a given set of q-values and pi-values
+        virtual /* Get the policy for a given set of q-values and pi-values
          * q_values: The q-values for each action
          * pi_values: The prior values for each action
          * counts: The number of times each action has been taken

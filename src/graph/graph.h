@@ -420,11 +420,11 @@ namespace htps {
      * */
     class PrioritizedNode {
     public:
-        Node* node;
+        std::shared_ptr<Node> node;
         size_t priority;
         size_t tactic_id;
 
-        PrioritizedNode(Node *node, size_t priority, size_t tactic_id) : node(node), priority(priority),
+        PrioritizedNode(std::shared_ptr<Node> node, size_t priority, size_t tactic_id) : node(node), priority(priority),
                                                                          tactic_id(tactic_id) {}
 
         bool operator<(const PrioritizedNode &other) const {
@@ -750,17 +750,31 @@ namespace htps {
         }
 
         // Get ancestors for a theorem
-        const AncestorSet &get_ancestors(const std::string &thm) const {
-            static const AncestorSet empty_set;
-            auto it = find(thm);
-            return it != end() ? it->second : empty_set;
+        const AncestorSet &get_ancestors(const std::string &thm) {
+            if (!contains(thm))
+                insert(thm, AncestorSet());
+            return at(thm);
         }
 
-        const AncestorSet &get_ancestors(const theorem &thm) const {
+        const AncestorSet &get_ancestors(const theorem &thm) {
             return get_ancestors(thm.unique_string);
         }
 
-        const AncestorSet &get_ancestors(const std::shared_ptr<theorem> &thm) const {
+        const AncestorSet &get_ancestors(const std::shared_ptr<theorem> &thm) {
+            return get_ancestors(*thm);
+        }
+
+        const AncestorSet get_ancestors(const std::string &thm) const {
+            if (!contains(thm))
+                return AncestorSet();
+            return at(thm);
+        }
+
+        const AncestorSet get_ancestors(const theorem &thm) const {
+            return get_ancestors(thm.unique_string);
+        }
+
+        const AncestorSet get_ancestors(const std::shared_ptr<theorem> &thm) const {
             return get_ancestors(*thm);
         }
 
@@ -820,7 +834,7 @@ namespace htps {
     class Graph {
     protected:
         std::shared_ptr<theorem> root;
-        TheoremMap<T> nodes;
+        TheoremMap<std::shared_ptr<T>> nodes;
         AncestorsMap ancestors;
         AncestorsMap permanent_ancestors;
         TheoremSet unexplored_theorems;
@@ -839,21 +853,21 @@ namespace htps {
         void reset_minimum_proof_stats() {
             minimum_proof_size = initial_minimum_proof_size;
             for (auto &[_, node]: nodes) {
-                node.reset_minimum_proof_stats();
+                node->reset_minimum_proof_stats();
             }
         }
 
         bool is_proven() const {
-            return nodes.contains(root) && nodes.at(root).is_solved();
+            return nodes.contains(root) && nodes.at(root)->is_solved();
         }
 
         virtual bool dead_root() const {
-            return nodes.contains(root) && nodes.at(root).all_tactics_killed();
+            return nodes.contains(root) && nodes.at(root)->all_tactics_killed();
         }
 
         void add_nodes(std::vector<T> &node_list) {
-            std::vector<T> to_check_solved;
-            std::vector<T> newly_solved;
+            std::vector<std::shared_ptr<T>> to_check_solved;
+            std::vector<std::shared_ptr<T>> newly_solved;
             for (auto &node: node_list) {
                 std::shared_ptr<theorem> th = node.get_theorem();
                 if (!ancestors.contains(th) || !permanent_ancestors.contains(th)) {
@@ -862,17 +876,18 @@ namespace htps {
                 if (nodes.contains(th)) {
                     throw std::invalid_argument("Node already exists");
                 }
-                nodes.set(th, node);
+                std::shared_ptr<T> node_ptr = std::make_shared<T>(node);
+                nodes.set(th, node_ptr);
                 if (node.is_bad()) {
                     for (const auto &[parent_th, tactic_id]: ancestors.get_ancestors(th)) {
                         if (!parent_th.empty()) {
-                            nodes.at(parent_th).kill_tactic(tactic_id);
+                            nodes.at(parent_th)->kill_tactic(tactic_id);
                         }
                     }
                     continue;
                 }
                 if (node.is_solved()) {
-                    newly_solved.push_back(node);
+                    newly_solved.push_back(node_ptr);
                     continue;
                 }
 
@@ -882,7 +897,8 @@ namespace htps {
                     auto children = children_for_tactic[i];
                     for (const auto &child: children) {
                         permanent_ancestors.add_ancestor(child, th, i);
-                        if (nodes.contains(child) && nodes.at(child).is_bad()) {
+                        ancestors.add_ancestor(child, th, i);
+                        if (nodes.contains(child) && nodes.at(child)->is_bad()) {
                             bad_tactic_ids.insert(i);
                         }
                     }
@@ -890,22 +906,23 @@ namespace htps {
                 for (size_t bad_tactic_id: bad_tactic_ids) {
                     node.kill_tactic(bad_tactic_id);
                 }
+                to_check_solved.push_back(node_ptr);
             }
             propagate_check_and_solved(newly_solved, to_check_solved);
         }
 
-        void kill_tactic(T node, size_t tactic_id) {
-            std::deque<std::pair<T, size_t>> to_kill;
+        void kill_tactic(std::shared_ptr<T> node, size_t tactic_id) {
+            std::deque<std::pair<std::shared_ptr<T>, size_t>> to_kill;
             std::shared_ptr<theorem> thm;
             to_kill.push_back({node, tactic_id});
             while (!to_kill.empty()) {
                 auto [current, tid] = to_kill.front();
                 to_kill.pop_front();
-                if (current.killed(tid)) {
+                if (current->killed(tid)) {
                     continue;
                 }
-                thm = current.get_theorem();
-                for (const auto &child: current.get_children_for_tactic(tid)) {
+                thm = current->get_theorem();
+                for (const auto &child: current->get_children_for_tactic(tid)) {
                     if (ancestors.contains(child, thm, tid)) {
                         ancestors.erase(child, thm, tid);
                         if (!ancestors.size(child)) {
@@ -918,7 +935,7 @@ namespace htps {
                 }
                 // If killing the tactics leads to all tactics killed, we need to kill all tactics leading to this node
                 // Since this node has become bad.
-                if (current.kill_tactic(tid)) {
+                if (current->kill_tactic(tid)) {
                     for (const auto &[parent, parent_tid]: ancestors.get_ancestors(thm)) {
                         if (!parent.empty()) {
                             to_kill.push_front({nodes.at(parent), parent_tid});
@@ -935,22 +952,22 @@ namespace htps {
                 unexplored_theorems.insert(*root);
                 return;
             }
-            std::deque<T> to_explore;
+            std::deque<std::shared_ptr<T>> to_explore;
             to_explore.push_back(nodes.at(root));
-            std::unordered_set<T> seen;
+            TheoremSet seen;
             while (!to_explore.empty()) {
-                T current = to_explore.front();
+                auto current = to_explore.front();
                 to_explore.pop_front();
-                if (seen.contains(current)) {
+                if (seen.contains(current->get_theorem())) {
                     continue;
                 }
-                seen.insert(current);
-                if (current.is_solved() && ignore_solved) {
+                seen.insert(current->get_theorem());
+                if (current->is_solved() && ignore_solved) {
                     continue;
                 }
-                std::vector<std::vector<std::shared_ptr<theorem>>> children = current.get_children_for_tactic();
+                std::vector<std::vector<std::shared_ptr<theorem>>> children = current->get_children_for_tactic();
                 for (size_t i = 0; i < children.size(); i++) {
-                    if (current.killed(i)) {
+                    if (current->killed(i)) {
                         continue;
                     }
                     for (const auto &child: children[i]) {
@@ -969,7 +986,7 @@ namespace htps {
          */
         void propagate_expandable() {
             for (auto &[thm, node]: nodes) {
-                node.set_expandable(false);
+                node->set_expandable(false);
             }
             std::vector<std::string> to_propagate;
             for (const auto &thm: unexplored_theorems) {
@@ -977,11 +994,11 @@ namespace htps {
                     if (parent.empty()) {
                         continue;
                     }
-                    T &node = nodes.at(parent);
-                    if (node.killed(tactic_id)) {
+                    auto &node = nodes.at(parent);
+                    if (node->killed(tactic_id)) {
                         continue;
                     }
-                    node.set_expandable(tactic_id, true);
+                    node->set_expandable(tactic_id, true);
                     to_propagate.push_back(parent);
                 }
             }
@@ -998,11 +1015,11 @@ namespace htps {
                     if (parent.empty()) {
                         continue;
                     }
-                    T &node = nodes.at(parent);
-                    if (node.killed(tactic_id)) {
+                    auto &node = nodes.at(parent);
+                    if (node->killed(tactic_id)) {
                         continue;
                     }
-                    node.set_expandable(tactic_id, true);
+                    node->set_expandable(tactic_id, true);
                     propagate_queue.push_front(parent);
                 }
             }
@@ -1011,8 +1028,8 @@ namespace htps {
         // Simple assertion to make sure there are no expandable and killed tactics
         void expandable_check() {
             for (const auto &[thm, node]: nodes) {
-                for (size_t i = 0; i < node.n_tactics(); i++) {
-                    assert(!(node.killed(i) && node.expandable(i)));
+                for (size_t i = 0; i < node->n_tactics(); i++) {
+                    assert(!(node->killed(i) && node->expandable(i)));
                 }
             }
         }
@@ -1030,7 +1047,7 @@ namespace htps {
                 expandable_check();
                 return;
             }
-            if (nodes.at(root).expandable()) {
+            if (nodes.at(root)->expandable()) {
                 expandable_check();
                 return;
             }
@@ -1041,36 +1058,39 @@ namespace htps {
         /* Given a set of newly solved nodes, propagate the solved status to all ancestors
          * This entails setting ancestors to solved if there is a tactic that solves all children
          */
-        void propagate_check_and_solved(const std::vector<T> &newly_solved, std::vector<T> &to_check_solved) {
-            std::deque<std::pair<T, size_t >> to_check;
-            std::deque<T> newly_solved_deque(newly_solved.begin(), newly_solved.end());
-            for (T &node: to_check_solved) {
-                for (size_t i = 0; i < node.n_tactics(); i++) {
+        void propagate_check_and_solved(const std::vector<std::shared_ptr<T>> &newly_solved, std::vector<std::shared_ptr<T>> &to_check_solved) {
+            std::deque<std::pair<std::shared_ptr<T>, size_t >> to_check;
+            std::deque<std::shared_ptr<T>> newly_solved_deque(newly_solved.begin(), newly_solved.end());
+            for (const auto &node: to_check_solved) {
+                for (size_t i = 0; i < node->n_tactics(); i++) {
                     to_check.push_back({node, i});
                 }
             }
-            while (!to_check.empty()) {
+            while (!to_check.empty() || !newly_solved_deque.empty()) {
                 while (!newly_solved_deque.empty()) {
-                    T &node = newly_solved_deque.front();
+                    auto node = newly_solved_deque.front();
                     newly_solved_deque.pop_front();
-                    assert(node.is_solved());
-                    for (const auto &[parent, tactic_id]: permanent_ancestors.get_ancestors(node.get_theorem())) {
+                    assert(node->is_solved());
+                    for (const auto &[parent, tactic_id]: permanent_ancestors.get_ancestors(node->get_theorem())) {
                         if (parent.empty()) {
                             continue;
                         }
                         to_check.push_back({nodes.at(parent), tactic_id});
                     }
                 }
+                if (to_check.empty()) {
+                    break;
+                }
                 auto [current, tid] = to_check.front();
                 to_check.pop_front();
-                if (!current.is_valid(tid)) {
+                if (!current->is_valid(tid)) {
                     continue;
                 }
-                auto children = current.get_children_for_tactic(tid);
+                auto children = current->get_children_for_tactic(tid);
                 if (std::all_of(children.begin(), children.end(), [this](std::shared_ptr<theorem> &thm) {
-                    return nodes.contains(thm) && nodes.at(thm).is_solved();
+                    return nodes.contains(thm) && nodes.at(thm)->is_solved();
                 })) {
-                    if (current.solved_by(tid))
+                    if (current->solved_by(tid))
                         newly_solved_deque.push_back(current);
                 }
             }
@@ -1080,18 +1100,18 @@ namespace htps {
         void check_solved_consistency() const {
             bool solved_requires_tactic = std::all_of(nodes.begin(), nodes.end(), [](const auto &pair) {
                 const auto &node = pair.second;
-                return node.is_solved() == (node.n_solving_tactics() > 0);
+                return node->is_solved() == (node->n_solving_tactics() > 0);
             });
             if (!solved_requires_tactic) {
                 throw std::runtime_error(
                         "Solved consistency check failed, at least one node is solved without a solving tactic or vice versa");
             }
             for (const auto &[thm, node]: nodes) {
-                const auto &children_for_tactic = node.get_children_for_tactic();
+                const auto &children_for_tactic = node->get_children_for_tactic();
                 for (size_t tactic_id = 0; tactic_id < children_for_tactic.size(); tactic_id++) {
                     const auto &children = children_for_tactic[tactic_id];
                     for (const auto &child: children) {
-                        if (node.killed(tactic_id))
+                        if (node->killed(tactic_id))
                             continue;
                         if (!ancestors.get_ancestors(child).contains(thm, tactic_id)) {
                             throw std::runtime_error("Ancestor consistency check failed, ancestor not found");
@@ -1101,14 +1121,14 @@ namespace htps {
             }
             for (const auto &[_, node]: nodes) {
                 bool should_be_solved = false;
-                const auto &children_for_tactic = node.get_children_for_tactic();
+                const auto &children_for_tactic = node->get_children_for_tactic();
                 for (size_t tactic_id = 0; tactic_id < children_for_tactic.size(); tactic_id++) {
                     const auto &children = children_for_tactic[tactic_id];
                     should_be_solved |= std::all_of(children.begin(), children.end(), [this](const std::shared_ptr<theorem> &thm) {
-                        return nodes.contains(thm) && nodes.at(thm).is_solved();
-                    }) && node.is_valid(tactic_id);
+                        return nodes.contains(thm) && nodes.at(thm)->is_solved();
+                    }) && node->is_valid(tactic_id);
                 }
-                if (should_be_solved != node.is_solved()) {
+                if (should_be_solved != node->is_solved()) {
                     throw std::runtime_error(
                             "Solved consistency check failed, node should be solved but is not or vice versa");
                 }
@@ -1119,7 +1139,7 @@ namespace htps {
             if (!nodes.contains(root)) {
                 return;
             }
-            if (!nodes.at(root).is_solved()) {
+            if (!nodes.at(root)->is_solved()) {
                 return;
             }
             TheoremSet seen;
@@ -1135,11 +1155,11 @@ namespace htps {
                     continue;
                 }
                 seen.insert(*current);
-                T &node = nodes.at(current);
-                assert (node.n_solving_tactics() > 0);
-                node.set_in_proof();
-                for (const auto &tactic_id: node.solving_range())
-                    for (const auto &child: node.get_children_for_tactic(tactic_id))
+                auto &node = nodes.at(current);
+                assert (node->n_solving_tactics() > 0);
+                node->set_in_proof();
+                for (const auto &tactic_id: node->solving_range())
+                    for (const auto &child: node->get_children_for_tactic(tactic_id))
                         to_visit.push_back(child);
             }
         }
@@ -1166,19 +1186,19 @@ namespace htps {
             if (!nodes.contains(thm)) {
                 throw std::invalid_argument("Theorem not found");
             }
-            const T &node = nodes.at(thm);
-            if (!node.is_solved()) {
+            const auto &node = nodes.at(thm);
+            if (!node->is_solved()) {
                 throw std::invalid_argument("Theorem not solved");
             }
-            if (!node.is_in_proof()) {
+            if (!node->is_in_proof()) {
                 throw std::invalid_argument("Theorem not in proof");
             }
-            size_t min_tac = node.minimum_tactic(metric);
+            size_t min_tac = node->minimum_tactic(metric);
             std::vector<proof> proofs;
-            for (const auto &child: node.get_children_for_tactic(min_tac)) {
+            for (const auto &child: node->get_children_for_tactic(min_tac)) {
                 proofs.push_back(minimal_proof(metric, child));
             }
-            return {thm, node.get_tactic(min_tac), proofs};
+            return {thm, node->get_tactic(min_tac), proofs};
         }
 
         /* Get minimal proof sizes for all nodes in the graph
@@ -1189,14 +1209,14 @@ namespace htps {
                 to_process.clear();
                 // For each solved leaf, create priority nodes for each tactic that solves the leaf
                 for (auto &[thm, node]: nodes) {
-                    if (!node.is_solved_leaf_node()) {
+                    if (!node->is_solved_leaf_node()) {
                         continue;
                     }
-                    for (const auto &tactic_id: node.solving_range()) {
+                    for (const auto &tactic_id: node->solving_range()) {
                         size_t priority = 1;
                         if (metric == TIME)
-                            priority = node.get_tactic(tactic_id)->duration;
-                        to_process.push_back({&node, priority, tactic_id});
+                            priority = node->get_tactic(tactic_id)->duration;
+                        to_process.push_back({node, priority, tactic_id});
                     }
                 }
 
@@ -1224,26 +1244,26 @@ namespace htps {
                         if (parent.empty()) {
                             continue;
                         }
-                        T &parent_node = nodes.at(parent);
+                        auto &parent_node = nodes.at(parent);
                         size_t added_priority = 1;
                         if (metric == TIME)
-                            added_priority = parent_node.get_tactic(parent_tactic)->duration;
+                            added_priority = parent_node->get_tactic(parent_tactic)->duration;
                         size_t new_priority = added_priority;
                         switch (metric) {
                             case DEPTH:
-                                new_priority += depth_for_children(parent_node.get_children_for_tactic(parent_tactic));
+                                new_priority += depth_for_children(parent_node->get_children_for_tactic(parent_tactic));
                                 break;
                             case SIZE:
-                                new_priority += size_for_children(parent_node.get_children_for_tactic(parent_tactic));
+                                new_priority += size_for_children(parent_node->get_children_for_tactic(parent_tactic));
                                 break;
                             case TIME:
-                                new_priority += time_for_children(parent_node.get_children_for_tactic(parent_tactic));
+                                new_priority += time_for_children(parent_node->get_children_for_tactic(parent_tactic));
                                 break;
                             default:
                                 throw std::invalid_argument("Invalid metric");
                         }
                         if (new_priority < MAXIMUM_PROOF_LENGTH) {
-                            pq.push({&parent_node, new_priority, parent_tactic});
+                            pq.push({parent_node, new_priority, parent_tactic});
                         }
                     }
                 }
@@ -1253,8 +1273,8 @@ namespace htps {
                     return;
 
                 assert(nodes.contains(root));
-                assert(nodes.at(root).minimum_length(metric) < MAXIMUM_PROOF_LENGTH);
-                minimum_proof_size.set(metric, nodes.at(root).minimum_length(metric));
+                assert(nodes.at(root)->minimum_length(metric) < MAXIMUM_PROOF_LENGTH);
+                minimum_proof_size.set(metric, nodes.at(root)->minimum_length(metric));
                 std::deque<std::shared_ptr<theorem>> to_visit;
                 to_visit.push_back(root);
                 TheoremSet seen;
@@ -1265,12 +1285,12 @@ namespace htps {
                         continue;
                     }
                     seen.insert(*current);
-                    T &node = nodes.at(current);
-                    node.set_in_minimum_proof(metric, true);
-                    assert(node.is_in_proof());
-                    assert(!node.minimum_tactics_range(metric).empty());
-                    for (const auto &tactic_id: node.minimum_tactics_range(metric)) {
-                        for (const auto &child: node.get_children_for_tactic(tactic_id)) {
+                    auto &node = nodes.at(current);
+                    node->set_in_minimum_proof(metric, true);
+                    assert(node->is_in_proof());
+                    assert(!node->minimum_tactics_range(metric).empty());
+                    for (const auto &tactic_id: node->minimum_tactics_range(metric)) {
+                        for (const auto &child: node->get_children_for_tactic(tactic_id)) {
                             to_visit.push_back(child);
                         }
                     }
@@ -1287,8 +1307,8 @@ namespace htps {
                 if (!nodes.contains(child)) {
                     return MAXIMUM_PROOF_LENGTH;
                 }
-                const T &node = nodes.at(child);
-                base = std::max(base, node.minimum_length(DEPTH));
+                const std::shared_ptr<T> &node = nodes.at(child);
+                base = std::max(base, node->minimum_length(DEPTH));
             }
             return base;
         }
@@ -1296,11 +1316,15 @@ namespace htps {
         size_t size_for_children(const std::vector<std::shared_ptr<theorem>> &children) const {
             size_t base = 0;
             for (const auto &child: children) {
+                // Overflow protection, otherwise we might add MAXIMUM_PROOF_LENGTH twice, which will overflow
+                if (base >= MAXIMUM_PROOF_LENGTH) {
+                    return MAXIMUM_PROOF_LENGTH;
+                }
                 if (!nodes.contains(child)) {
                     return MAXIMUM_PROOF_LENGTH;
                 }
-                const T &node = nodes.at(child);
-                base += node.minimum_length(SIZE);
+                const std::shared_ptr<T> &node = nodes.at(child);
+                base += node->minimum_length(SIZE);
             }
             return base;
         }
@@ -1308,11 +1332,15 @@ namespace htps {
         size_t time_for_children(const std::vector<std::shared_ptr<theorem>> &children) const {
             size_t base = 0;
             for (const auto &child: children) {
+                // Overflow protection, otherwise we might add MAXIMUM_PROOF_LENGTH twice, which will overflow
+                if (base >= MAXIMUM_PROOF_LENGTH) {
+                    return MAXIMUM_PROOF_LENGTH;
+                }
                 if (!nodes.contains(child)) {
                     return MAXIMUM_PROOF_LENGTH;
                 }
-                const T &node = nodes.at(child);
-                base += node.minimum_length(TIME);
+                const std::shared_ptr<T> &node = nodes.at(child);
+                base += node->minimum_length(TIME);
             }
             return base;
         }

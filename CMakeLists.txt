@@ -18,12 +18,12 @@ add_executable(tokenizer src/tokenization/create_tokenizer.cpp src/tokenization/
 
 add_executable(test tests/htps_tests.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
 
-add_subdirectory(Tokenizer)
+add_subdirectory(external/Tokenizer)
 target_link_libraries(htps OpenNMTTokenizer)
 target_link_libraries(tokenizer OpenNMTTokenizer)
 target_link_libraries(test OpenNMTTokenizer)
 
-add_subdirectory(glob)
+add_subdirectory(external/glob)
 target_link_libraries(htps Glob)
 target_link_libraries(tokenizer Glob)
 target_link_libraries(test Glob)

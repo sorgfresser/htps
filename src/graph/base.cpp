@@ -7,6 +7,14 @@
 
 using namespace htps;
 
+bool hypothesis::operator==(const hypothesis &h) const {
+    return identifier == h.identifier && type == h.type;
+}
+
+
+bool theorem::operator==(const theorem &t) const {
+    return unique_string == t.unique_string;
+}
 
 bool tactic::operator==(const tactic &t) const {
     return unique_string == t.unique_string;
@@ -57,8 +65,8 @@ std::size_t std::hash<theorem>::operator()(const theorem &t) const {
     return std::hash<std::string>{}(t.unique_string);
 }
 
-std::size_t std::hash<std::pair<std::shared_ptr<htps::theorem>, size_t>>::operator()(
-        const std::pair<std::shared_ptr<htps::theorem>, size_t> &p) const {
+std::size_t std::hash<std::pair<std::shared_ptr<htps::theorem>, size_t> >::operator()(
+    const std::pair<std::shared_ptr<htps::theorem>, size_t> &p) const {
     const auto second_hash = std::hash<size_t>{}(p.second);
     const auto first = p.first;
     const auto first_hash = first ? std::hash<htps::theorem>{}(*first) : 0;

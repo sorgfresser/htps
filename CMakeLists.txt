@@ -19,6 +19,8 @@ find_package(Python COMPONENTS Interpreter Compiler Development)
 add_executable(htps src/main.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
 
 add_executable(pythonhtps python/htps.cpp)
+target_compile_definitions(pythonhtps PRIVATE PYTHON_BINDINGS)
+
 target_link_libraries(pythonhtps PRIVATE Python::Python)
 
 add_executable(tokenizer src/tokenization/create_tokenizer.cpp src/tokenization/tokenization_utils.cpp)

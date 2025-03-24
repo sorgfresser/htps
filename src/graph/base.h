@@ -10,6 +10,9 @@
 
 namespace htps {
     struct tactic {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         std::string unique_string;
         bool is_valid;
         size_t duration; // duration in milliseconds
@@ -29,20 +32,26 @@ struct std::hash<htps::tactic> {
 
 namespace htps {
     struct hypothesis {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         std::string identifier;
         std::string type;
 
         static hypothesis from_json(const std::string &json);
 
-        bool operator==(const hypothesis &h) const = default;
+        bool operator==(const hypothesis &h) const;
     };
 
     struct theorem {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         std::string conclusion;
         std::vector<hypothesis> hypotheses;
         std::string unique_string;
 
-        bool operator==(const theorem &t) const = default;
+        bool operator==(const theorem &t) const;
 
         virtual std::vector<std::string> tokenize() const = 0;
 

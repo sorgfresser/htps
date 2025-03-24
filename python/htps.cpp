@@ -1,7 +1,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
-#include "../src/graph/htps.h"
 #include <descrobject.h>
+#include "../src/graph/htps.h"
+#include "../src/graph/lean.h"
 
 static PyObject *PolicyTypeEnum = NULL;
 static PyObject *QValueSolvedEnum = NULL;
@@ -406,6 +407,202 @@ static PyTypeObject ParamsType = {
     (newfunc)Params_new,
 };
 
+static PyObject * Hypothesis_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    htps::hypothesis *self = (htps::hypothesis*) type->tp_alloc(type, 0);
+    if (!self) {
+        PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    return (PyObject *) self;
+}
+
+static int Hypothesis_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    htps::hypothesis * h = (htps::hypothesis *) self;
+    const char *identifier = nullptr;
+    const char *type_str = nullptr;
+    static char *kwlist[] = { (char*)"identifier", (char*)"value", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss", kwlist, &identifier, &type_str))
+        return -1;
+    h->identifier = identifier;
+    h->type = type_str;
+    return 0;
+}
+
+static PyMemberDef HypothesisMembers[] = {
+    {"identifier", Py_T_STRING, offsetof(htps::hypothesis, identifier), Py_READONLY, "Identifier for a hypothesis"},
+    {"value", Py_T_STRING, offsetof(htps::hypothesis, type), Py_READONLY, "Type of the hypothesis"},
+    {NULL}
+};
+
+static PyTypeObject HypothesisType = {
+PyObject_HEAD_INIT(NULL) "htps.Hypothesis",
+    sizeof(htps::hypothesis),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Py_TPFLAGS_DEFAULT,
+    "A single hypothesis for HyperTreeProofSearch",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    HypothesisMembers,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    (initproc)Hypothesis_init,
+    NULL,
+    (newfunc)Hypothesis_new,
+};
+
+
+
+static PyObject *Tactic_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    htps::lean_tactic *self = (htps::lean_tactic*) type->tp_alloc(type, 0);
+    if (!self) {
+        PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    return (PyObject *) self;
+}
+
+static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    htps::lean_tactic *t = (htps::lean_tactic *) self;
+    const char *unique_str = nullptr;
+    int is_valid;
+    size_t duration;
+    static char *kwlist[] = { (char*)"unique_string", (char*)"is_valid", (char*)"duration", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "spn", kwlist, &unique_str, &is_valid, &duration))
+        return -1;
+    t->unique_string = unique_str;
+    t->is_valid = is_valid ? true : false;
+    t->duration = duration;
+    return 0;
+}
+
+
+static PyMemberDef TacticMembers[] = {
+    {"unique_string", Py_T_STRING, offsetof(htps::lean_tactic, unique_string), Py_READONLY, "Unique identifier for a tactic"},
+    {"is_valid", Py_T_BOOL, offsetof(htps::lean_tactic, is_valid), Py_READONLY, "Whether the tactic is valid or not"},
+    {"duration", Py_T_LONG, offsetof(htps::lean_tactic, duration), Py_READONLY, "Duration in milliseconds"},
+    {NULL}
+};
+
+
+static PyTypeObject TacticType = {
+    PyObject_HEAD_INIT(NULL) "htps.Tactic",
+    sizeof(htps::lean_tactic),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Py_TPFLAGS_DEFAULT,
+    "A single tactic for HyperTreeProofSearch",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    TacticMembers,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    (initproc)Tactic_init,
+    NULL,
+    (newfunc)Tactic_new,
+    };
+
+//
+// static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+//     auto *self = (htps::theorem *) type->tp_alloc(type, 0);
+//     if (!self) {
+//         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+//         return NULL;
+//     }
+//     return (PyObject *) self;
+// }
+//
+// static int Theorem_init
+//
+//
+//
+// static PyTypeObject TheoremType = {
+//     PyObject_HEAD_INIT(NULL) "htps.Theorem",
+// sizeof(htps::theorem),
+// 0,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// Py_TPFLAGS_DEFAULT,
+// "A single theorem for HyperTreeProofSearch",
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// NULL,
+// (initproc)Theorem_init,
+// NULL,
+// (newfunc)Theorem_new,
+// };
+
+
 PyMODINIT_FUNC
 PyInit_htps(void) {
     PyObject *m = PyModule_Create(&htps_module);
@@ -515,6 +712,56 @@ PyInit_htps(void) {
         Py_XDECREF(&ParamsType);
         return NULL;
     }
+
+    if (PyType_Ready(&HypothesisType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        return NULL;
+    }
+
+    Py_INCREF(&HypothesisType);
+    if (PyModule_AddObject(m, "Hypothesis", (PyObject *) &HypothesisType) < 0) {
+        Py_DECREF(m); Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_XDECREF(&HypothesisType);
+        return NULL;
+    }
+
+    if (PyType_Ready(&TacticType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        return NULL;
+    }
+
+    Py_INCREF(&TacticType);
+    if (PyModule_AddObject(m, "Tactic", (PyObject *) &TacticType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_XDECREF(&TacticType);
+        return NULL;
+    }
+
 
 
     return m;

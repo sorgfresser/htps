@@ -12,19 +12,26 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+
+find_package(Python COMPONENTS Interpreter Compiler Development)
+
+
 add_executable(htps src/main.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
+
+add_executable(pythonhtps python/htps.cpp)
+target_link_libraries(pythonhtps PRIVATE Python::Python)
 
 add_executable(tokenizer src/tokenization/create_tokenizer.cpp src/tokenization/tokenization_utils.cpp)
 
 add_executable(test tests/htps_tests.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
 
 add_subdirectory(external/Tokenizer)
-target_link_libraries(htps OpenNMTTokenizer)
+target_link_libraries(htps PRIVATE OpenNMTTokenizer)
 target_link_libraries(tokenizer OpenNMTTokenizer)
 target_link_libraries(test OpenNMTTokenizer)
 
 add_subdirectory(external/glob)
-target_link_libraries(htps Glob)
+target_link_libraries(htps PRIVATE Glob)
 target_link_libraries(tokenizer Glob)
 target_link_libraries(test Glob)
 

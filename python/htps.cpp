@@ -548,59 +548,204 @@ static PyTypeObject TacticType = {
     (newfunc)Tactic_new,
     };
 
-//
-// static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-//     auto *self = (htps::theorem *) type->tp_alloc(type, 0);
-//     if (!self) {
-//         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
-//         return NULL;
-//     }
-//     return (PyObject *) self;
-// }
-//
-// static int Theorem_init
-//
-//
-//
-// static PyTypeObject TheoremType = {
-//     PyObject_HEAD_INIT(NULL) "htps.Theorem",
-// sizeof(htps::theorem),
-// 0,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// Py_TPFLAGS_DEFAULT,
-// "A single theorem for HyperTreeProofSearch",
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// NULL,
-// (initproc)Theorem_init,
-// NULL,
-// (newfunc)Theorem_new,
-// };
+
+static PyObject *Context_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    htps::lean_context *self = (htps::lean_context*) type->tp_alloc(type, 0);
+    if (!self) {
+        PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    return (PyObject *) self;
+}
+
+static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    htps::lean_context *c = (htps::lean_context *) self;
+    static char *kwlist[] = { (char*)"namespaces", NULL };
+    PyObject *namespace_set, *iterator;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &namespace_set))
+        return -1;
+    iterator = PyObject_GetIter(namespace_set);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "namespaces must be iterable");
+        return -1;
+    }
+
+    std::set<std::string> namespaces;
+    PyObject *item;
+    while ((item = PyIter_Next(iterator))) {
+        if (!PyUnicode_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "each namespace must be a string");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        const char *namespace_str = PyUnicode_AsUTF8(item);
+        if (namespace_str)
+            namespaces.insert(namespace_str);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    c->namespaces = std::move(namespaces);
+    return 0;
+}
+
+static PyObject* Context_get_namespaces(PyObject *self, void* closure) {
+    htps::lean_context *context = (htps::lean_context *) self;
+    PyObject *py_list = PyList_New(context->namespaces.size());
+    if (!py_list)
+        return NULL;
+    size_t i = 0;
+    for (const auto &ns : context->namespaces) {
+        PyObject *py_str = PyUnicode_FromString(ns.c_str());
+        if (!py_str) {
+            Py_DECREF(py_list);
+            return NULL;
+        }
+        PyList_SetItem(py_list, i++, py_str);
+    }
+    return py_list;
+}
+
+static int Context_set_namespaces(PyObject *self, PyObject *value, void *closure) {
+    htps::lean_context *context = (htps::lean_context *) self;
+    PyObject * iterator = PyObject_GetIter(value);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "namespaces must be iterable");
+        return -1;
+    }
+
+    std::set<std::string> namespaces;
+    PyObject *item;
+    while ((item = PyIter_Next(iterator))) {
+        if (!PyUnicode_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "each namespace must be a string");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        const char *namespace_str = PyUnicode_AsUTF8(item);
+        if (namespace_str)
+            namespaces.insert(namespace_str);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    context->namespaces = std::move(namespaces);
+    return 0;
+}
+
+static PyGetSetDef Context_getsetters[] = {
+    {"namespaces", (getter)Context_get_namespaces, (setter)Context_set_namespaces, "Namespaces set", NULL},
+    {NULL}
+};
+
+
+static PyTypeObject ContextType = {
+    PyObject_HEAD_INIT(NULL) "htps.Context",
+sizeof(htps::lean_context),
+0,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+Py_TPFLAGS_DEFAULT,
+"The underlying context for HyperTreeProofSearch",
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+Context_getsetters,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+(initproc)Context_init,
+NULL,
+(newfunc)Context_new,
+};
+
+
+
+static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    auto *self = (htps::theorem *) type->tp_alloc(type, 0);
+    if (!self) {
+        PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    return (PyObject *) self;
+}
+
+static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
+    htps::lean_theorem *t = (htps::lean_theorem *) self;
+    const char *unique_str = nullptr;
+    int is_valid;
+    size_t duration;
+    static char *kwlist[] = { (char*)"unique_string", (char*)"is_valid", (char*)"duration", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "spn", kwlist, &unique_str, &is_valid, &duration))
+        return -1;
+    t->unique_string = unique_str;
+    return 0;
+}
+
+
+
+
+
+static PyTypeObject TheoremType = {
+    PyObject_HEAD_INIT(NULL) "htps.Theorem",
+sizeof(htps::theorem),
+0,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+Py_TPFLAGS_DEFAULT,
+"A single theorem for HyperTreeProofSearch",
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+(initproc)Theorem_init,
+NULL,
+(newfunc)Theorem_new,
+};
 
 
 PyMODINIT_FUNC
@@ -759,6 +904,34 @@ PyInit_htps(void) {
         Py_DECREF(&ParamsType);
         Py_DECREF(&HypothesisType);
         Py_XDECREF(&TacticType);
+        return NULL;
+    }
+
+    if (PyType_Ready(&ContextType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        return NULL;
+    }
+
+    Py_INCREF(&ContextType);
+    if (PyModule_AddObject(m, "Context", (PyObject *) &ContextType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_XDECREF(&ContextType);
         return NULL;
     }
 

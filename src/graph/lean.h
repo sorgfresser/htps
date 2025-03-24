@@ -11,6 +11,9 @@
 
 namespace htps {
     struct lean_context {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         std::set<std::string> namespaces; // we need a sorted set because the order should not influence tokenization
 
         lean_context() = default;

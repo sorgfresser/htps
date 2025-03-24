@@ -130,6 +130,9 @@ namespace htps {
 
 
     struct htps_params {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         double exploration;
         PolicyType policy_type;
         size_t num_expansions; // maximal number of expansions until the HTPS is considered done
@@ -185,8 +188,8 @@ namespace htps {
         bool operator==(const Simulation &other) const;
 
         explicit Simulation(std::shared_ptr<theorem> &root)
-                : theorems(), tactics(), depth(), children_for_theorem(), values(), tactic_ids(),
-                  root(root), expansions(0), virtual_count_added(), parent_for_theorem() {
+                : theorems(), tactic_ids(), tactics(), depth(), children_for_theorem(), parent_for_theorem(),
+                  values(), solved(), virtual_count_added(), seen(), root(root), expansions(0) {
             theorems.insert(root, root);
             depth.insert(root, 0);
             parent_for_theorem.insert(root, nullptr);
@@ -322,9 +325,9 @@ namespace htps {
                  const std::vector<std::shared_ptr<env_effect>> &effects,
                  const size_t seed = 42) :
                 Node(thm, tactics, children_for_tactic), old_critic_value(0.0), log_critic_value(log_critic_value),
-                priors(priors), q_value_solved(q_value_solved), policy(policy), exploration(exploration),
-                tactic_init_value(tactic_init_value), effects(effects), reset_mask(tactics.size()),
-                log_w(tactics.size()) {
+                priors(priors), q_value_solved(q_value_solved), effects(effects), policy(policy), exploration(exploration),
+                tactic_init_value(tactic_init_value), log_w(tactics.size()), counts(), virtual_counts(),
+                reset_mask(tactics.size()) {
             assert(_validate());
             reset_HTPS_stats();
         }
@@ -335,12 +338,12 @@ namespace htps {
                   log_critic_value(node.log_critic_value),
                   priors(node.priors),
                   q_value_solved(node.q_value_solved),
+                  effects(node.effects),
                   policy(node.policy),
                   exploration(node.exploration),
                   tactic_init_value(node.tactic_init_value),
-                  effects(node.effects),
-                  reset_mask(node.reset_mask),
-                  log_w(node.log_w) {
+                  log_w(node.log_w),
+                  reset_mask(node.reset_mask) {
             assert(_validate());
             reset_HTPS_stats();
         }

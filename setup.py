@@ -11,7 +11,7 @@ setup(
         "htps",
         ["python/htps.cpp"],
         include_dirs=["src"],
-        extra_compile_args=["-std=c++20", "-O3", "-pedantic"], # Compiler specific
+        extra_compile_args=["-std=c++20", "-O3", "-pedantic", "-DPYTHON_BINDINGS"], # Compiler specific
         extra_link_args=[],
         define_macros=[],
     ),

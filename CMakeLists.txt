@@ -17,25 +17,23 @@ find_package(Python COMPONENTS Interpreter Compiler Development)
 
 
 add_executable(htps src/main.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
+target_include_directories(htps PRIVATE external/glob/single_include)
+add_executable(pythonhtps python/htps.cpp src/graph/lean.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp)
+target_include_directories(pythonhtps PRIVATE external/glob/single_include)
 
-add_executable(pythonhtps python/htps.cpp)
 target_compile_definitions(pythonhtps PRIVATE PYTHON_BINDINGS)
-
 target_link_libraries(pythonhtps PRIVATE Python::Python)
 
 add_executable(tokenizer src/tokenization/create_tokenizer.cpp src/tokenization/tokenization_utils.cpp)
-
+target_include_directories(tokenizer PRIVATE external/glob/single_include)
 add_executable(test tests/htps_tests.cpp src/graph/base.cpp src/graph/graph.cpp src/tokenization/tokenizer.cpp src/tokenization/tokenization_utils.cpp src/graph/htps.cpp src/model/policy.cpp)
+target_include_directories(test PRIVATE external/glob/single_include)
 
 add_subdirectory(external/Tokenizer)
 target_link_libraries(htps PRIVATE OpenNMTTokenizer)
+target_link_libraries(pythonhtps PRIVATE OpenNMTTokenizer)
 target_link_libraries(tokenizer OpenNMTTokenizer)
 target_link_libraries(test OpenNMTTokenizer)
-
-add_subdirectory(external/glob)
-target_link_libraries(htps PRIVATE Glob)
-target_link_libraries(tokenizer Glob)
-target_link_libraries(test Glob)
 
 target_link_libraries(test gtest_main)
 include(GoogleTest)

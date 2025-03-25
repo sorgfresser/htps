@@ -1,6 +1,9 @@
 #ifndef HTPS_BASE_H
 #define HTPS_BASE_H
-
+#ifdef PYTHON_BINDINGS
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#endif
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -56,6 +59,8 @@ namespace htps {
         virtual std::vector<std::string> tokenize() const = 0;
 
         virtual void tokenize(std::vector<std::string> &tokens) const = 0;
+
+        theorem() = default;
 
         theorem(const std::string &conclusion, const std::vector<hypothesis> &hypotheses) : conclusion(conclusion),
                                                                                             hypotheses(hypotheses) {

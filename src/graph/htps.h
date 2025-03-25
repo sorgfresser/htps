@@ -4,7 +4,10 @@
 
 #ifndef HTPS_HTPS_H
 #define HTPS_HTPS_H
-
+#ifdef PYTHON_BINDINGS
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#endif
 #include "graph.h"
 #include "base.h"
 #include "../model/policy.h"

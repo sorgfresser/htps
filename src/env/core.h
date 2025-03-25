@@ -6,6 +6,7 @@
 #define HTPS_CORE_H
 
 #include "../graph/base.h"
+#include "../model/policy.h"
 #include <memory>
 #include <vector>
 #include <optional>

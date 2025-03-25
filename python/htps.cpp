@@ -408,20 +408,22 @@ static PyTypeObject ParamsType = {
 };
 
 static PyObject * Hypothesis_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    htps::hypothesis *self = (htps::hypothesis*) type->tp_alloc(type, 0);
+    auto *self = (htps::hypothesis*) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
+    new (&(self->identifier)) std::string();
+    new (&(self->type)) std::string();
     return (PyObject *) self;
 }
 
 static int Hypothesis_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    htps::hypothesis * h = (htps::hypothesis *) self;
+    auto* h = (htps::hypothesis *) self;
     const char *identifier = nullptr;
     const char *type_str = nullptr;
-    static char *kwlist[] = { (char*)"identifier", (char*)"value", NULL };
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss", kwlist, &identifier, &type_str))
+    static const char *kwlist[] = { "identifier", "value", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss", const_cast<char**>(kwlist), &identifier, &type_str))
         return -1;
     h->identifier = identifier;
     h->type = type_str;
@@ -477,16 +479,17 @@ PyObject_HEAD_INIT(NULL) "htps.Hypothesis",
 
 
 static PyObject *Tactic_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    htps::lean_tactic *self = (htps::lean_tactic*) type->tp_alloc(type, 0);
+    auto *self = (htps::lean_tactic*) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
+    new (&(self->unique_string)) std::string();
     return (PyObject *) self;
 }
 
 static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    htps::lean_tactic *t = (htps::lean_tactic *) self;
+    auto *t = (htps::lean_tactic *) self;
     const char *unique_str = nullptr;
     int is_valid;
     size_t duration;
@@ -550,16 +553,17 @@ static PyTypeObject TacticType = {
 
 
 static PyObject *Context_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    htps::lean_context *self = (htps::lean_context*) type->tp_alloc(type, 0);
+    auto *self = (htps::lean_context*) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
+    new (&(self->namespaces)) std::set<std::string>();
     return (PyObject *) self;
 }
 
 static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    htps::lean_context *c = (htps::lean_context *) self;
+    auto *c = (htps::lean_context *) self;
     static char *kwlist[] = { (char*)"namespaces", NULL };
     PyObject *namespace_set, *iterator;
 
@@ -591,7 +595,7 @@ static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 static PyObject* Context_get_namespaces(PyObject *self, void* closure) {
-    htps::lean_context *context = (htps::lean_context *) self;
+    auto *context = (htps::lean_context *) self;
     PyObject *py_list = PyList_New(context->namespaces.size());
     if (!py_list)
         return NULL;
@@ -608,7 +612,7 @@ static PyObject* Context_get_namespaces(PyObject *self, void* closure) {
 }
 
 static int Context_set_namespaces(PyObject *self, PyObject *value, void *closure) {
-    htps::lean_context *context = (htps::lean_context *) self;
+    auto *context = (htps::lean_context *) self;
     PyObject * iterator = PyObject_GetIter(value);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "namespaces must be iterable");
@@ -639,12 +643,17 @@ static PyGetSetDef Context_getsetters[] = {
     {NULL}
 };
 
+static void Context_dealloc(PyObject* self) {
+    auto *ctx = (htps::lean_context*) self;
+     ctx->namespaces.~set<std::string>();
+    Py_TYPE(self)->tp_free(self);
+}
 
 static PyTypeObject ContextType = {
     PyObject_HEAD_INIT(NULL) "htps.Context",
 sizeof(htps::lean_context),
 0,
-NULL,
+Context_dealloc,
 NULL,
 NULL,
 NULL,
@@ -681,35 +690,235 @@ NULL,
 };
 
 
-
 static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::theorem *) type->tp_alloc(type, 0);
+    auto *self = (htps::lean_theorem *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
+    new (&(self->conclusion)) std::string();
+    new (&(self->hypotheses)) std::vector<htps::hypothesis>();
+    new (&(self->unique_string)) std::string();
+    new (&(self->context)) htps::lean_context();
+    new (&(self->past_tactics)) std::vector<htps::lean_tactic>();
+
     return (PyObject *) self;
 }
 
 static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
-    htps::lean_theorem *t = (htps::lean_theorem *) self;
+    auto *t = (htps::lean_theorem *) self;
     const char *unique_str = nullptr;
-    int is_valid;
-    size_t duration;
-    static char *kwlist[] = { (char*)"unique_string", (char*)"is_valid", (char*)"duration", NULL };
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "spn", kwlist, &unique_str, &is_valid, &duration))
+    const char *conclusion = nullptr;
+    PyObject *context, *hypotheses, *past_tactics;
+    static char *kwlist[] = { (char*)"conclusion", (char*)"unique_string", (char*)"hypotheses", (char*)"context", (char*)"past_tactics", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssOOO", kwlist, &conclusion, &unique_str, &hypotheses, &context, &past_tactics))
         return -1;
     t->unique_string = unique_str;
+    t->conclusion = conclusion;
+
+    if (!PyObject_TypeCheck(context, &ContextType)) {
+        PyErr_SetString(PyExc_TypeError, "context must be a Context object");
+        return -1;
+    }
+    auto *c_ctx = (htps::lean_context*) context;
+    // Copy underlying Lean context
+    t->set_context(*c_ctx);
+
+    PyObject *iterator = PyObject_GetIter(hypotheses);
+    if (!iterator) {
+    PyErr_SetString(PyExc_TypeError, "hypotheses must be iterable!");
+    return -1;
+    }
+    std::vector<htps::hypothesis> theses;
+    PyObject *item;
+    t->hypotheses.clear();
+    while ((item = PyIter_Next(iterator))) {
+        if (!PyObject_TypeCheck(item, &HypothesisType)) {
+            PyErr_SetString(PyExc_TypeError, "each hypothesis must be a Hypothesis object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        auto *h = (htps::hypothesis*) item;
+        theses.push_back(*h);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    t->hypotheses = theses;
+
+    iterator = PyObject_GetIter(past_tactics);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "past_tactics must be iterable!");
+        return -1;
+    }
+    std::vector<htps::lean_tactic> tacs;
+    t->reset_tactics();
+    while ((item = PyIter_Next(iterator))) {
+        if (!PyObject_TypeCheck(item, &TacticType)) {
+            PyErr_SetString(PyExc_TypeError, "each tactic must be a Tactic object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        auto *tactic = (htps::lean_tactic*) item;
+        tacs.push_back(*tactic);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    t->set_tactics(tacs);
+    return 0;
+}
+
+static PyObject *Theorem_get_context(PyObject *self, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    auto *new_ctx = (htps::lean_context *) Context_new(&ContextType, NULL, NULL);
+    if (!new_ctx)
+        return PyErr_NoMemory();
+    new_ctx->namespaces = thm->context.namespaces;
+    return (PyObject*) new_ctx;
+}
+
+static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "new context is not set");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(value, &ContextType)) {
+        PyErr_SetString(PyExc_TypeError, "context must be a Context object");
+        return -1;
+    }
+    auto *new_ctx = (htps::lean_context *) value;
+    thm->set_context(*new_ctx);
+    return 0;
+}
+
+static PyObject *Theorem_get_hypotheses(PyObject *self, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    PyObject *list = PyList_New(thm->hypotheses.size());
+    if (!list)
+        return PyErr_NoMemory();
+
+    for (size_t i = 0; i < thm->hypotheses.size(); i++) {
+        // Call the class to get a new object
+        PyObject *args = Py_BuildValue("ss", thm->hypotheses[i].identifier.c_str(), thm->hypotheses[i].type.c_str());
+        if (!args) {
+            return NULL;
+        }
+        PyObject *hyp_obj = PyObject_CallObject((PyObject *) &HypothesisType, args);
+        if (!hyp_obj) {
+            Py_DECREF(list);
+            Py_DECREF(args);
+            return NULL;
+        }
+        Py_DECREF(args);
+        PyList_SET_ITEM(list, i, hyp_obj);
+    }
+    return list;
+}
+
+
+static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "new hypotheses is not set");
+        return -1;
+    }
+    PyObject *iterator = PyObject_GetIter(value);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "hypotheses must be an iterable");
+        return -1;
+    }
+
+    std::vector<htps::hypothesis> new_hypotheses;
+    PyObject *item;
+    while ((item = PyIter_Next(iterator)) != NULL) {
+        // Check that each element is a hypothesis
+        if (!PyObject_TypeCheck(item, &HypothesisType)) {
+            PyErr_SetString(PyExc_TypeError, "Each hypothesis must be a Hypothesis object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        auto *hyp = (htps::hypothesis*) item;
+        new_hypotheses.push_back(*hyp);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    thm->hypotheses = new_hypotheses;
+    return 0;
+}
+
+static PyObject *Theorem_get_past_tactics(PyObject *self, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    PyObject *list = PyList_New(thm->past_tactics.size());
+    if (!list)
+        return PyErr_NoMemory();
+
+    for (size_t i = 0; i < thm->past_tactics.size(); i++) {
+        PyObject *args = Py_BuildValue("sOn", thm->past_tactics[i].unique_string.c_str(), thm->past_tactics[i].is_valid ? Py_True : Py_False, (Py_ssize_t) thm->past_tactics[i].duration);
+        if (!args) {
+            return NULL;
+        }
+        PyObject *tac_obj = PyObject_CallObject((PyObject *) &TacticType, args);
+        if (!tac_obj) {
+            Py_DECREF(list);
+            Py_DECREF(args);
+            return NULL;
+        }
+        Py_DECREF(args);
+        PyList_SET_ITEM(list, i, tac_obj);
+    }
+    return list;
+}
+
+static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "new past tactics is not set");
+        return -1;
+    }
+    PyObject *iterator = PyObject_GetIter(value);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "past_tactics must be an iterable");
+        return -1;
+    }
+    std::vector<htps::lean_tactic> new_tactics;
+    PyObject *item;
+    while ((item = PyIter_Next(iterator)) != NULL) {
+        if (!PyObject_TypeCheck(item, &TacticType)) {
+            PyErr_SetString(PyExc_TypeError, "Each tactic must be a Tactic object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        auto *tactic = (htps::lean_tactic*) item;
+        new_tactics.push_back(*tactic);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    thm->set_tactics(new_tactics);
     return 0;
 }
 
 
 
+static PyMemberDef Theorem_members[] = {
+    {"conclusion", Py_T_STRING, offsetof(htps::lean_theorem, conclusion), Py_READONLY, "Conclusion of the theorem"},
+    {"unique_string", Py_T_STRING, offsetof(htps::lean_theorem, unique_string), Py_READONLY, "Unique string of the theorem"},
+    {NULL}
+};
 
+static PyGetSetDef Theorem_getsetters[] = {
+    {"context", Theorem_get_context, Theorem_set_context, "Context of the theorem", NULL},
+    {"hypotheses", Theorem_get_hypotheses, Theorem_set_hypotheses, "Hypotheses of theorem", NULL},
+    {"past_tactics", Theorem_get_past_tactics, Theorem_set_past_tactics, "Past tactics of theorem", NULL},
+    {NULL}
+};
 
 static PyTypeObject TheoremType = {
     PyObject_HEAD_INIT(NULL) "htps.Theorem",
-sizeof(htps::theorem),
+sizeof(htps::lean_theorem),
 0,
 NULL,
 NULL,
@@ -735,8 +944,8 @@ NULL,
 NULL,
 NULL,
 NULL,
-NULL,
-NULL,
+Theorem_members,
+Theorem_getsetters,
 NULL,
 NULL,
 NULL,
@@ -747,7 +956,7 @@ NULL,
 (newfunc)Theorem_new,
 };
 
-
+extern "C"
 PyMODINIT_FUNC
 PyInit_htps(void) {
     PyObject *m = PyModule_Create(&htps_module);
@@ -935,6 +1144,35 @@ PyInit_htps(void) {
         return NULL;
     }
 
+    if (PyType_Ready(&TheoremType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        return NULL;
+    }
+
+    Py_INCREF(&TheoremType);
+    if (PyModule_AddObject(m, "Theorem", (PyObject *) &TheoremType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_XDECREF(&TheoremType);
+        return NULL;
+    }
 
 
     return m;

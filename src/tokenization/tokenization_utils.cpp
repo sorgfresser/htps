@@ -2,7 +2,7 @@
 #include <onmt/BPELearner.h>
 #include <onmt/BPE.h>
 #include <onmt/Tokenizer.h>
-#include <glob/glob.h>
+#include <glob/glob.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iostream>

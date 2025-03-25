@@ -36,25 +36,44 @@ std::vector<std::string> lean_context::tokenize() const {
     return tokens;
 }
 
-std::vector<std::string> lean_theorem::tokenize() const {
+void lean_theorem::tokenize(std::vector<std::string> &tokens) const {
     std::vector<std::string> context_tokens = {B_NS_WORD};
     context.tokenize(context_tokens);
     context_tokens.push_back(E_NS_WORD);
 
-    std::vector<std::string> result = {B_GOAL_WORD};
-    result.insert(result.begin(), context_tokens.begin(), context_tokens.end());
+    tokens = {B_GOAL_WORD};
+    tokens.insert(tokens.begin(), context_tokens.begin(), context_tokens.end());
     std::vector<std::string> conclusion_tokens;
     global_tokenizer.tokenize(conclusion, conclusion_tokens);
-    result.insert(result.end(), conclusion_tokens.begin(), conclusion_tokens.end());
-    result.push_back(E_GOAL_WORD);
+    tokens.insert(tokens.end(), conclusion_tokens.begin(), conclusion_tokens.end());
+    tokens.push_back(E_GOAL_WORD);
 
     // Past tactics
     std::vector<std::string> tactic_tokens;
     for (const auto &tactic: past_tactics) {
-        result.push_back(M_STACK_WORD);
+        tokens.push_back(M_STACK_WORD);
         tactic.tokenize(tactic_tokens);
-        result.insert(result.end(), tactic_tokens.begin(), tactic_tokens.end());
+        tokens.insert(tokens.end(), tactic_tokens.begin(), tactic_tokens.end());
     }
+}
 
+
+std::vector<std::string> lean_theorem::tokenize() const {
+    std::vector<std::string> result;
+    tokenize(result);
     return result;
+}
+
+
+void lean_theorem::set_context(const lean_context ctx) {
+    context.namespaces = ctx.namespaces;
+}
+
+void lean_theorem::reset_tactics() {
+    past_tactics.clear();
+}
+
+
+void lean_theorem::set_tactics(std::vector<lean_tactic> &tactics) {
+    past_tactics = tactics;
 }

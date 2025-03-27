@@ -259,6 +259,8 @@ namespace htps {
         void reset_expansions();
 
         void increment_expansions();
+
+        size_t num_tactics();
     };
 }
 
@@ -272,7 +274,8 @@ struct std::hash<htps::Simulation> {
         hashes.reserve(2 * sim.theorems.size());
         for (const auto &[unique_str, thm]: sim) {
             hashes.push_back(std::hash<htps::theorem>{}(*thm));
-            hashes.push_back(std::hash<htps::tactic>{}(*sim.get_tactic(thm)));
+            if (sim.tactics.contains(thm))
+                hashes.push_back(std::hash<htps::tactic>{}(*sim.get_tactic(thm)));
         }
         return hash_vector(hashes);
     }
@@ -483,6 +486,23 @@ namespace htps {
                 Graph<HTPSNode, PrioritizedNode>(root), policy(policy), params(params), expansion_count(0),
                 train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
                 currently_expanding(), propagate_needed(true), done(false) {};
+
+        HTPS(std::shared_ptr<theorem> &root, const htps_params &params) :
+            Graph<HTPSNode, PrioritizedNode>(root), params(params), expansion_count(0),
+                train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
+                currently_expanding(), propagate_needed(true), done(false) {
+            policy = std::make_shared<Policy>(params.policy_type, params.exploration);
+        }
+
+        HTPS() : Graph<HTPSNode, PrioritizedNode>(), params(), expansion_count(0),
+                train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
+                currently_expanding(), propagate_needed(true), done(false) {};
+
+        void set_root(std::shared_ptr<theorem> &thm);
+
+        void set_params(const htps_params &new_params);
+
+
 
         void get_train_samples(std::vector<HTPSSampleEffect> &samples_effects,
                                std::vector<HTPSSampleCritic> &samples_critic,

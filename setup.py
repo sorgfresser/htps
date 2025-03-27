@@ -9,7 +9,7 @@ setup(
     ext_modules=[
         Extension(
         "htps",
-        ["python/htps.cpp", "src/graph/lean.cpp", "src/graph/htps.cpp", "src/tokenization/tokenization_utils.cpp", "src/tokenization/tokenizer.cpp", "src/graph/base.cpp", "src/graph/graph.cpp", "src/env/core.cpp"],
+        ["python/htps.cpp", "src/graph/lean.cpp", "src/graph/htps.cpp", "src/tokenization/tokenization_utils.cpp", "src/tokenization/tokenizer.cpp", "src/graph/base.cpp", "src/graph/graph.cpp", "src/env/core.cpp", "src/model/policy.cpp"],
         include_dirs=["src", "external/Tokenizer", "external/Tokenizer/include", "external/Tokenizer/build", "external/glob/single_include"],
         library_dirs=["external/Tokenizer/build"],
         runtime_library_dirs=["external/Tokenizer/build"],

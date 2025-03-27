@@ -65,7 +65,7 @@ std::vector<std::string> lean_theorem::tokenize() const {
 }
 
 
-void lean_theorem::set_context(const lean_context ctx) {
+void lean_theorem::set_context(const lean_context& ctx) {
     context.namespaces = ctx.namespaces;
 }
 

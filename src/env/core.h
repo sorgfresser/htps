@@ -4,7 +4,10 @@
 
 #ifndef HTPS_CORE_H
 #define HTPS_CORE_H
-
+#ifdef PYTHON_BINDINGS
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#endif
 #include "../graph/base.h"
 #include "../model/policy.h"
 #include <memory>
@@ -13,6 +16,9 @@
 
 namespace htps {
     struct env_effect {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
         std::shared_ptr<theorem> goal;
         std::shared_ptr<tactic> tac;
         std::vector<std::shared_ptr<theorem>> children;
@@ -33,6 +39,7 @@ namespace htps {
         bool is_error() const {
             return error.has_value();
         }
+        env_expansion() = default;
 
         env_expansion(std::shared_ptr<theorem> &thm, size_t expander_duration, size_t generation_duration,
                       std::vector<size_t> &env_durations, std::string &error) :

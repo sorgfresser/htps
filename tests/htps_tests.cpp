@@ -71,6 +71,7 @@ protected:
     std::shared_ptr<DummyTactic> dummyTac;
     std::shared_ptr<DummyTactic> dummyTac2;
     std::shared_ptr<Policy> dummyPolicy;
+    DummyParams dummyParams;
 
     void SetUp() override {
         // Create a dummy root theorem.
@@ -82,7 +83,6 @@ protected:
         // Create a dummy policy.
         dummyPolicy = std::make_shared<DummyPolicy>();
 
-        DummyParams dummyParams;
         dummyParams.node_mask = MinimalProof;
         dummyParams.critic_subsampling_rate = 1.0;
         dummyParams.effect_subsampling_rate = 1.0;
@@ -334,4 +334,46 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     to_expand = htps_instance->theorems_to_expand();
     EXPECT_TRUE(htps_instance->is_proven());
     EXPECT_TRUE(to_expand.empty());
+}
+
+TEST_F(HTPSTest, TestBackupOnce) {
+    // Modify params
+    auto params = dummyParams;
+    dummyParams.backup_once = true;
+    htps_instance->set_params(dummyParams);
+
+    EXPECT_FALSE(htps_instance->is_proven());
+    //std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+
+    htps_instance->theorems_to_expand();
+    // Create children for the root theorem.
+    std::vector<std::shared_ptr<htps::theorem>> children;
+    for (int i = 0; i < 2; i++) {
+        //auto child = std::make_shared<DummyTheorem>(conv.from_bytes("B"));
+        auto child = std::make_shared<DummyTheorem>("B");
+        children.push_back(child);
+    }
+
+    // Create a dummy expansion effect for the root theorem.
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {children[0]};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {children[1]};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac};
+    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{children[0]}, {children[1]}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
 }

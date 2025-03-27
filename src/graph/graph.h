@@ -607,6 +607,8 @@ namespace htps {
     protected:
         std::unordered_map<std::string, T> _map;
     public:
+        TheoremMap() : _map() {};
+
         auto begin() const noexcept {
             return _map.begin();
         }
@@ -850,6 +852,8 @@ namespace htps {
             unexplored_theorems.insert(*root);
         }
 
+        Graph() = default;
+
         void reset_minimum_proof_stats() {
             minimum_proof_size = initial_minimum_proof_size;
             for (auto &[_, node]: nodes) {
@@ -876,6 +880,9 @@ namespace htps {
                 if (nodes.contains(th)) {
                     throw std::invalid_argument("Node already exists");
                 }
+#ifdef VERBOSE_PRINTS
+                printf("Nodes size %i\n", nodes.size());
+#endif
                 std::shared_ptr<T> node_ptr = std::make_shared<T>(node);
                 nodes.set(th, node_ptr);
                 if (node.is_bad()) {

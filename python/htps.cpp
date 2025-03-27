@@ -956,6 +956,1012 @@ NULL,
 (newfunc)Theorem_new,
 };
 
+
+PyObject* Theorem_NewFromShared(const std::shared_ptr<htps::theorem>& thm_ptr) {
+    auto thm = std::dynamic_pointer_cast<htps::lean_theorem>(thm_ptr);
+    PyObject *obj = Theorem_new(&TheoremType, NULL, NULL);
+    if (obj == NULL)
+        return NULL;
+    auto *c_obj = (htps::lean_theorem *) obj;
+    c_obj->conclusion = thm->conclusion;
+    c_obj->unique_string  = thm->unique_string;
+    c_obj->set_context(thm->context);
+    c_obj->hypotheses = thm->hypotheses;
+    c_obj->past_tactics = thm->past_tactics;
+    return obj;
+}
+
+PyObject* Tactic_NewFromShared(const std::shared_ptr<htps::tactic>& tac_ptr) {
+    auto tac = std::dynamic_pointer_cast<htps::lean_tactic>(tac_ptr);
+    PyObject *obj = Tactic_new(&TacticType, NULL, NULL);
+    if (obj == NULL)
+        return NULL;
+    auto *c_obj = (htps::lean_tactic *) obj;
+    c_obj->unique_string = tac->unique_string;
+    c_obj->is_valid = tac->is_valid;
+    c_obj->duration = tac->duration;
+    return obj;
+}
+
+
+
+
+static PyObject *EnvEffect_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    auto *self = (htps::env_effect *)type->tp_alloc(type, 0);
+    if (self == NULL)
+        return PyErr_NoMemory();
+    auto shared_thm = static_pointer_cast<htps::lean_theorem>(std::make_shared<htps::lean_theorem>());
+    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>());
+    self->goal = shared_thm;
+    self->children = std::vector<std::shared_ptr<htps::theorem>>();
+    self->tac = shared_tactic;
+    return (PyObject *)self;
+}
+
+static int EnvEffect_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    PyObject *py_goal, *py_tac, *py_children;
+    static const char *kwlist[] = {"goal", "tactic", "children", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO", const_cast<char**>(kwlist), &py_goal, &py_tac, &py_children))
+        return -1;
+
+    if (!PyObject_TypeCheck(py_goal, &TheoremType)) {
+        PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(py_tac, &TacticType)) {
+        PyErr_SetString(PyExc_TypeError, "tac must be a Tactic object");
+        return -1;
+    }
+    PyObject *iterator = PyObject_GetIter(py_children);
+    if (!iterator) {
+        PyErr_SetString(PyExc_TypeError, "children must be iterable");
+        return -1;
+    }
+    std::vector<std::shared_ptr<htps::theorem>> children_vec;
+    PyObject *item;
+    while ((item = PyIter_Next(iterator)) != NULL) {
+        if (!PyObject_TypeCheck(item, &TheoremType)) {
+            PyErr_SetString(PyExc_TypeError, "each child must be a Theorem object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return -1;
+        }
+        auto lean_thm = (htps::lean_theorem *) item;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+        children_vec.push_back(shared_thm);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    auto *eff = (htps::env_effect *) self;
+    auto lean_thm = (htps::lean_theorem *) py_goal;
+    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+    auto lean_tactic = (htps::lean_tactic *) py_tac;
+    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*lean_tactic));
+    eff->goal = shared_thm;
+    eff->tac = shared_tactic;
+    eff->children = children_vec;
+    return 0;
+}
+
+static PyObject *EnvEffect_get_goal(PyObject *self, void *closure) {
+    auto *effect = (htps::env_effect *) self;
+    return Theorem_NewFromShared(effect->goal);
+}
+
+static int EnvEffect_set_goal(PyObject *self, PyObject *value, void *closure) {
+    auto *effect = (htps::env_effect *) self;
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "no value provided for the goal attribute");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(value, &TheoremType)) {
+        PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
+        return -1;
+    }
+    auto lean_thm = (htps::lean_theorem *) value;
+    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+    effect->goal = shared_thm;
+    return 0;
+}
+
+static PyObject *EnvEffect_get_tac(PyObject *self, void *closure) {
+    auto *effect = (htps::env_effect *) self;
+    return Tactic_NewFromShared(effect->tac);
+}
+
+static int EnvEffect_set_tac(PyObject *self, PyObject *value, void *closure) {
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "no value provided for the tac attribute");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(value, &TacticType)) {
+        PyErr_SetString(PyExc_TypeError, "tac must be a Tactic object");
+        return -1;
+    }
+    auto *effect = (htps::env_effect *) self;
+    auto lean_tac = (htps::lean_tactic *) value;
+    auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*lean_tac));
+    effect->tac = shared_tac;
+    return 0;
+}
+
+
+static PyObject *EnvEffect_get_children(PyObject *self, void *closure){
+    auto *effect = (htps::env_effect *) self;
+    const std::vector<std::shared_ptr<htps::theorem>> &children = effect->children;
+    PyObject *list = PyList_New(children.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < children.size(); i++) {
+        PyObject *child_obj = Theorem_NewFromShared(children[i]);
+        if (!child_obj) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, child_obj);
+    }
+    return list;
+}
+
+static int EnvEffect_set_children(PyObject *self, PyObject *value, void *closure) {
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "no value provided for the children attribute");
+        return -1;
+    }
+    PyObject *iter = PyObject_GetIter(value);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "children must be iterable");
+        return -1;
+    }
+    std::vector<std::shared_ptr<htps::theorem>> new_children;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyObject_TypeCheck(item, &TheoremType)) {
+            PyErr_SetString(PyExc_TypeError, "each child must be a Theorem object");
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            return -1;
+        }
+        auto lean_thm = (htps::lean_theorem *) item;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+        new_children.push_back(shared_thm);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    auto *effect = (htps::env_effect *) self;
+    effect->children = new_children;
+    return 0;
+}
+static PyGetSetDef EnvEffect_getsetters[] = {
+    {"goal", (getter)EnvEffect_get_goal, (setter)EnvEffect_set_goal, "Goal theorem", NULL},
+    {"tactic", (getter)EnvEffect_get_tac, (setter)EnvEffect_set_tac, "Tactic", NULL},
+    {"children", (getter)EnvEffect_get_children, (setter)EnvEffect_set_children, "Children theorems", NULL},
+    {NULL}
+};
+
+static PyTypeObject EnvEffectType = {
+    PyObject_HEAD_INIT(NULL) "htps.EnvEffect",
+sizeof(htps::env_effect),
+0,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+Py_TPFLAGS_DEFAULT,
+"A single EnvEffect, i.e. a tactic applied on a goal, for HyperTreeProofSearch",
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+EnvEffect_getsetters,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+(initproc)EnvEffect_init,
+NULL,
+(newfunc)EnvEffect_new,
+};
+
+PyObject* EnvEffect_NewFromShared(const std::shared_ptr<htps::env_effect>& eff) {
+    PyObject *obj = EnvEffect_new(&EnvEffectType, NULL, NULL);
+    if (obj == NULL)
+        return NULL;
+    auto *c_obj = (htps::env_effect *) obj;
+    c_obj->goal = eff->goal;
+    c_obj->tac = eff->tac;
+    c_obj->children = eff->children;
+    return obj;
+}
+
+typedef struct {
+    PyObject_HEAD
+    htps::env_expansion expansion;
+} PyEnvExpansion;
+
+static void EnvExpansion_dealloc(PyObject *self) {
+    ((PyEnvExpansion *)self)->expansion.~env_expansion();
+    Py_TYPE(self)->tp_free(self);
+}
+
+static PyObject *EnvExpansion_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    auto *self = (PyEnvExpansion *)type->tp_alloc(type, 0);
+    if (self == NULL) {
+        return PyErr_NoMemory();
+    }
+    new (&(self->expansion)) htps::env_expansion();
+    return (PyObject *)self;
+}
+
+static PyObject *EnvExpansion_get_thm(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    return Theorem_NewFromShared(obj->expansion.thm);
+}
+
+static int EnvExpansion_set_thm(PyObject *self, PyObject *value, void *closure) {
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "received empty thm attribute");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(value, &TheoremType)) {
+        PyErr_SetString(PyExc_TypeError, "thm must be a Theorem object");
+        return -1;
+    }
+    auto *obj = (PyEnvExpansion *)self;
+    auto *c_thm = (htps::lean_theorem *) value;
+    obj->expansion.thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_expander_duration(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    return PyLong_FromSize_t(obj->expansion.expander_duration);
+}
+
+static int EnvExpansion_set_expander_duration(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (!PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "expander_duration must be an integer");
+        return -1;
+    }
+    obj->expansion.expander_duration = PyLong_AsSize_t(value);
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_generation_duration(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    return PyLong_FromSize_t(obj->expansion.generation_duration);
+}
+
+static int EnvExpansion_set_generation_duration(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (!PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "generation_duration must be an integer");
+        return -1;
+    }
+    obj->expansion.generation_duration = PyLong_AsSize_t(value);
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_env_durations(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    const std::vector<size_t>& vec = obj->expansion.env_durations;
+    PyObject *list = PyList_New(vec.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < vec.size(); i++) {
+        PyObject *num = PyLong_FromSize_t(vec[i]);
+        if (!num) {
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        PyList_SET_ITEM(list, i, num);
+    }
+    return list;
+}
+
+static int EnvExpansion_set_env_durations(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    PyObject *iter = PyObject_GetIter(value);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "env_durations must be iterable");
+        return -1;
+    }
+    std::vector<size_t> vec;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyLong_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "each env duration must be an integer");
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            return -1;
+        }
+        vec.push_back(PyLong_AsSize_t(item));
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    obj->expansion.env_durations = vec;
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_effects(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    const std::vector<std::shared_ptr<htps::env_effect>> &effects = obj->expansion.effects;
+    PyObject *list = PyList_New(effects.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < effects.size(); i++) {
+        PyObject *eff_obj = EnvEffect_NewFromShared(effects[i]);
+        if (!eff_obj) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, eff_obj);
+    }
+    return list;
+}
+
+static int EnvExpansion_set_effects(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    PyObject *iter = PyObject_GetIter(value);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "effects must be iterable");
+        return -1;
+    }
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyObject_TypeCheck(item, &EnvEffectType)) {
+            PyErr_SetString(PyExc_TypeError, "each effect must be an EnvEffect object");
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            return -1;
+        }
+        auto *eff = (htps::env_effect *) item;
+        auto shared_eff = std::static_pointer_cast<htps::env_effect>(std::make_shared<htps::env_effect>(*eff));
+        effects.push_back(shared_eff);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    obj->expansion.effects = effects;
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_log_critic(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    return PyFloat_FromDouble(obj->expansion.log_critic);
+}
+
+static int EnvExpansion_set_log_critic(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (!PyFloat_Check(value) && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "log_critic must be a number");
+        return -1;
+    }
+    obj->expansion.log_critic = PyFloat_AsDouble(value);
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_tactics(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    const std::vector<std::shared_ptr<htps::tactic>> &tactics = obj->expansion.tactics;
+    PyObject *list = PyList_New(tactics.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < tactics.size(); i++) {
+        PyObject *tac_obj = Tactic_NewFromShared(tactics[i]);
+        if (!tac_obj) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, tac_obj);
+    }
+    return list;
+}
+
+static int EnvExpansion_set_tactics(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    PyObject *iter = PyObject_GetIter(value);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "tactics must be iterable");
+        return -1;
+    }
+    std::vector<std::shared_ptr<htps::tactic>> tactics;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyObject_TypeCheck(item, &TacticType)) {
+            PyErr_SetString(PyExc_TypeError, "each tactic must be a Tactic object");
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            return -1;
+        }
+        auto *tac = (htps::lean_tactic *) item;
+        auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*tac));
+        tactics.push_back(shared_tac);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    obj->expansion.tactics = tactics;
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_children_for_tactic(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    const auto &outer = obj->expansion.children_for_tactic;
+    PyObject *outer_list = PyList_New(outer.size());
+    if (!outer_list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < outer.size(); i++) {
+        const auto &inner = outer[i];
+        PyObject *inner_list = PyList_New(inner.size());
+        if (!inner_list) {
+            Py_DECREF(outer_list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < inner.size(); j++) {
+            PyObject *thm_obj = Theorem_NewFromShared(inner[j]);
+            if (!thm_obj) {
+                Py_DECREF(inner_list);
+                Py_DECREF(outer_list);
+                return NULL;
+            }
+            PyList_SET_ITEM(inner_list, j, thm_obj);
+        }
+        PyList_SET_ITEM(outer_list, i, inner_list);
+    }
+    return outer_list;
+}
+
+static int EnvExpansion_set_children_for_tactic(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    PyObject *iter_outer = PyObject_GetIter(value);
+    if (!iter_outer) {
+        PyErr_SetString(PyExc_TypeError, "children_for_tactic must be iterable");
+        return -1;
+    }
+    std::vector<std::vector<std::shared_ptr<htps::theorem>>> outer;
+    PyObject *item_outer;
+    while ((item_outer = PyIter_Next(iter_outer)) != NULL) {
+        PyObject *iter_inner = PyObject_GetIter(item_outer);
+        if (!iter_inner) {
+            PyErr_SetString(PyExc_TypeError, "each element of children_for_tactic must be iterable");
+            Py_DECREF(item_outer);
+            Py_DECREF(iter_outer);
+            return -1;
+        }
+        std::vector<std::shared_ptr<htps::theorem>> inner;
+        PyObject *item_inner;
+        while ((item_inner = PyIter_Next(iter_inner)) != NULL) {
+            if (!PyObject_TypeCheck(item_inner, &TheoremType)) {
+                PyErr_SetString(PyExc_TypeError, "each child must be a Theorem object");
+                Py_DECREF(item_inner);
+                Py_DECREF(iter_inner);
+                Py_DECREF(item_outer);
+                Py_DECREF(iter_outer);
+                return -1;
+            }
+            auto *thm = (htps::lean_theorem *) item_inner;
+            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*thm));
+            inner.push_back(shared_thm);
+            Py_DECREF(item_inner);
+        }
+        Py_DECREF(iter_inner);
+        outer.push_back(inner);
+        Py_DECREF(item_outer);
+    }
+    Py_DECREF(iter_outer);
+    obj->expansion.children_for_tactic = outer;
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_priors(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    const auto &priors = obj->expansion.priors;
+    PyObject *list = PyList_New(priors.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < priors.size(); i++) {
+        PyObject *num = PyFloat_FromDouble(priors[i]);
+        if (!num) {
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        PyList_SET_ITEM(list, i, num);
+    }
+    return list;
+}
+
+static int EnvExpansion_set_priors(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    PyObject *iter = PyObject_GetIter(value);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "priors must be iterable");
+        return -1;
+    }
+    std::vector<double> priors;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyFloat_Check(item) && !PyLong_Check(item)) {
+            PyErr_SetString(PyExc_TypeError, "each prior must be a number");
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            return -1;
+        }
+        priors.push_back(PyFloat_AsDouble(item));
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    obj->expansion.priors = priors;
+    return 0;
+}
+
+static PyObject *PyObject_from_string(const std::string &str) {
+    return PyUnicode_FromString(str.c_str());
+}
+
+static std::string PyObject_to_string(PyObject *obj) {
+    if (!PyUnicode_Check(obj)) {
+        throw std::invalid_argument("Expected a Unicode object");
+    }
+    const char *utf8_str = PyUnicode_AsUTF8(obj);
+    if (!utf8_str) {
+        // PyUnicode_AsUTF8 returns NULL and sets an exception if conversion fails.
+        throw std::runtime_error("Failed to convert PyObject to a UTF-8 string");
+    }
+    return {utf8_str};
+}
+
+static PyObject *EnvExpansion_get_error(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (obj->expansion.error.has_value()) {
+        return PyObject_from_string(obj->expansion.error.value());
+    }
+
+    Py_RETURN_NONE;
+}
+
+static int EnvExpansion_set_error(PyObject *self, PyObject *value, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (value == NULL || value == Py_None) {
+        obj->expansion.error.reset();
+        return 0;
+    }
+    if (!PyUnicode_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "error must be a string or None");
+        return -1;
+    }
+    try {
+        obj->expansion.error = PyObject_to_string(value);
+    } catch (std::runtime_error &) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static PyObject *EnvExpansion_get_is_error(PyObject *self, void *closure) {
+    auto *obj = (PyEnvExpansion *)self;
+    if (obj->expansion.is_error())
+        Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static const char *kwlist_full[] = {
+        "thm", "expander_duration", "generation_duration", "env_durations",
+        "effects", "log_critic", "tactics", "children_for_tactic", "priors", NULL
+    };
+    static const char *kwlist_error[] = {
+        "thm", "expander_duration", "generation_duration", "env_durations", "error", NULL
+    };
+
+    PyObject *py_thm = NULL, *py_env_durations = NULL;
+    unsigned long expander_duration, generation_duration;
+    // Two constructors, we try both
+    {
+        PyObject *py_effects = NULL, *py_tactics = NULL, *py_children = NULL, *py_priors = NULL;
+        double log_critic;
+        if (PyArg_ParseTupleAndKeywords(args, kwargs, "OkkOOdOOO", const_cast<char**>(kwlist_full),
+                                        &py_thm, &expander_duration, &generation_duration, &py_env_durations,
+                                        &py_effects, &log_critic, &py_tactics, &py_children, &py_priors)) {
+            if (!PyObject_TypeCheck(py_thm, &TheoremType)) {
+                PyErr_SetString(PyExc_TypeError, "thm must be a Theorem object");
+                return -1;
+            }
+            auto *c_thm = (htps::lean_theorem *)py_thm;
+            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+
+            std::vector<size_t> env_durations;
+            PyObject *iter = PyObject_GetIter(py_env_durations);
+            if (!iter) {
+                PyErr_SetString(PyExc_TypeError, "env_durations must be iterable");
+                return -1;
+            }
+            PyObject *item;
+            while ((item = PyIter_Next(iter)) != NULL) {
+                if (!PyLong_Check(item)) {
+                    PyErr_SetString(PyExc_TypeError, "env_durations must contain integers");
+                    Py_DECREF(item);
+                    Py_DECREF(iter);
+                    return -1;
+                }
+                env_durations.push_back(PyLong_AsSize_t(item));
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            std::vector<std::shared_ptr<htps::env_effect>> effects;
+            iter = PyObject_GetIter(py_effects);
+            if (!iter) {
+                PyErr_SetString(PyExc_TypeError, "effects must be iterable");
+                return -1;
+            }
+            while ((item = PyIter_Next(iter)) != NULL) {
+                if (!PyObject_TypeCheck(item, &EnvEffectType)) {
+                    PyErr_SetString(PyExc_TypeError, "each effect must be an EnvEffect object");
+                    Py_DECREF(item);
+                    Py_DECREF(iter);
+                    return -1;
+                }
+                auto *eff = (htps::env_effect *) item;
+                auto shared_eff = std::static_pointer_cast<htps::env_effect>(std::make_shared<htps::env_effect>(*eff));
+                effects.push_back(shared_eff);
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            std::vector<std::shared_ptr<htps::tactic>> tactics;
+            iter = PyObject_GetIter(py_tactics);
+            if (!iter) {
+                PyErr_SetString(PyExc_TypeError, "tactics must be iterable");
+                return -1;
+            }
+            while ((item = PyIter_Next(iter)) != NULL) {
+                if (!PyObject_TypeCheck(item, &TacticType)) {
+                    PyErr_SetString(PyExc_TypeError, "each tactic must be a Tactic object");
+                    Py_DECREF(item);
+                    Py_DECREF(iter);
+                    return -1;
+                }
+                auto *tac = (htps::lean_tactic *) item;
+                auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*tac));
+                tactics.push_back(shared_tac);
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            std::vector<std::vector<std::shared_ptr<htps::theorem>>> children_for_tactic;
+            iter = PyObject_GetIter(py_children);
+            if (!iter) {
+                PyErr_SetString(PyExc_TypeError, "children_for_tactic must be iterable");
+                return -1;
+            }
+            while ((item = PyIter_Next(iter)) != NULL) {
+                std::vector<std::shared_ptr<htps::theorem>> inner;
+                PyObject *iter_inner = PyObject_GetIter(item);
+                if (!iter_inner) {
+                    PyErr_SetString(PyExc_TypeError, "each element of children_for_tactic must be iterable");
+                    Py_DECREF(item);
+                    Py_DECREF(iter);
+                    return -1;
+                }
+                PyObject *inner_item;
+                while ((inner_item = PyIter_Next(iter_inner)) != NULL) {
+                    if (!PyObject_TypeCheck(inner_item, &TheoremType)) {
+                        PyErr_SetString(PyExc_TypeError, "each child must be a Theorem object");
+                        Py_DECREF(inner_item);
+                        Py_DECREF(iter_inner);
+                        Py_DECREF(item);
+                        Py_DECREF(iter);
+                        return -1;
+                    }
+                    auto *child = (htps::lean_theorem *) inner_item;
+                    auto shared_child = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*child));
+                    inner.push_back(shared_child);
+                    Py_DECREF(inner_item);
+                }
+                Py_DECREF(iter_inner);
+                children_for_tactic.push_back(inner);
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            std::vector<double> priors;
+            iter = PyObject_GetIter(py_priors);
+            if (!iter) {
+                PyErr_SetString(PyExc_TypeError, "priors must be iterable");
+                return -1;
+            }
+            while ((item = PyIter_Next(iter)) != NULL) {
+                if (!PyFloat_Check(item) && !PyLong_Check(item)) {
+                    PyErr_SetString(PyExc_TypeError, "each prior must be a number");
+                    Py_DECREF(item);
+                    Py_DECREF(iter);
+                    return -1;
+                }
+                priors.push_back(PyFloat_AsDouble(item));
+                Py_DECREF(item);
+            }
+            Py_DECREF(iter);
+            new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(
+                shared_thm, expander_duration, generation_duration, env_durations,
+                effects, log_critic, tactics, children_for_tactic, priors
+            );
+            return 0;
+        }
+    }
+    // Try the error one
+
+        PyObject *py_error = NULL;
+        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OkkOO", const_cast<char**>(kwlist_error),
+                                         &py_thm, &expander_duration, &generation_duration, &py_env_durations, &py_error))
+        {
+            return -1;
+        }
+        if (!PyObject_TypeCheck(py_thm, &TheoremType)) {
+            PyErr_SetString(PyExc_TypeError, "thm must be a Theorem object");
+            return -1;
+        }
+        auto *c_thm = (htps::lean_theorem *)py_thm;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+        std::vector<size_t> env_durations;
+        PyObject *iter = PyObject_GetIter(py_env_durations);
+        if (!iter) {
+            PyErr_SetString(PyExc_TypeError, "env_durations must be iterable");
+            return -1;
+        }
+        PyObject *item;
+        while ((item = PyIter_Next(iter)) != NULL) {
+            if (!PyLong_Check(item)) {
+                PyErr_SetString(PyExc_TypeError, "env_durations must contain integers");
+                Py_DECREF(item);
+                Py_DECREF(iter);
+                return -1;
+            }
+            env_durations.push_back(PyLong_AsSize_t(item));
+            Py_DECREF(item);
+        }
+        Py_DECREF(iter);
+
+        std::string error;
+
+        if (py_error == Py_None) {
+            PyErr_SetString(PyExc_TypeError, "Error must be set for this constructor to work!");
+            return -1;
+        }
+        if (!PyUnicode_Check(py_error)) {
+                PyErr_SetString(PyExc_TypeError, "error must be a string or None");
+                return -1;
+        }
+        try {
+            error = PyObject_to_string(py_error);
+        }
+        catch (std::runtime_error &) {
+            return -1;
+        }
+        new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(
+            shared_thm, expander_duration, generation_duration, env_durations, error
+        );
+        return 0;
+
+}
+
+static PyGetSetDef EnvExpansion_getsetters[] = {
+    {"thm", (getter)EnvExpansion_get_thm, (setter)EnvExpansion_set_thm, "Theorem for expansion", NULL},
+    {"expander_duration", (getter)EnvExpansion_get_expander_duration, (setter)EnvExpansion_set_expander_duration, "Expander duration", NULL},
+    {"generation_duration", (getter)EnvExpansion_get_generation_duration, (setter)EnvExpansion_set_generation_duration, "Generation duration", NULL},
+    {"env_durations", (getter)EnvExpansion_get_env_durations, (setter)EnvExpansion_set_env_durations, "Environment durations", NULL},
+    {"effects", (getter)EnvExpansion_get_effects, (setter)EnvExpansion_set_effects, "EnvEffects", NULL},
+    {"log_critic", (getter)EnvExpansion_get_log_critic, (setter)EnvExpansion_set_log_critic, "Log critic value", NULL},
+    {"tactics", (getter)EnvExpansion_get_tactics, (setter)EnvExpansion_set_tactics, "Tactics", NULL},
+    {"children_for_tactic", (getter)EnvExpansion_get_children_for_tactic, (setter)EnvExpansion_set_children_for_tactic, "Children for each tactic", NULL},
+    {"priors", (getter)EnvExpansion_get_priors, (setter)EnvExpansion_set_priors, "Priors", NULL},
+    {"error", (getter)EnvExpansion_get_error, (setter)EnvExpansion_set_error, "Error string (optional)", NULL},
+    {"is_error", (getter)EnvExpansion_get_is_error, NULL, "Returns True if error is set", NULL},
+    {NULL}
+};
+
+
+static PyTypeObject EnvExpansionType = {
+    PyObject_HEAD_INIT(NULL) "htps.EnvExpansion",
+sizeof(PyEnvExpansion),
+0,
+(destructor)EnvExpansion_dealloc,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+Py_TPFLAGS_DEFAULT,
+"A full EnvExpansion for HyperTreeProofSearch",
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+EnvExpansion_getsetters,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+(initproc)EnvExpansion_init,
+NULL,
+(newfunc)EnvExpansion_new,
+};
+
+
+
+typedef struct {
+#ifdef PYTHON_BINDINGS
+    PyObject_HEAD
+#endif
+    htps::HTPS graph;
+} PyHTPS;
+
+
+static PyObject *HTPS_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    auto *self = (PyHTPS *) type->tp_alloc(type, 0);
+    if (!self) {
+        PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    new (&(self->graph)) htps::HTPS();
+    return (PyObject *) self;
+}
+
+static int HTPS_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    auto *tree = (PyHTPS *) self;
+    PyObject *thm, *params;
+    static char *kwlist[] = { (char*)"theorem", (char*)"params", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist, &thm, &params))
+        return -1;
+    if (!PyObject_TypeCheck(thm, &TheoremType)) {
+        PyErr_SetString(PyExc_TypeError, "theorem must be a Theorem object");
+        return -1;
+    }
+    auto *c_thm = (htps::lean_theorem *) thm;
+    if (!PyObject_TypeCheck(params, &ParamsType)) {
+        PyErr_SetString(PyExc_TypeError, "params must be a SearchParams object");
+        return -1;
+    }
+    auto *c_params = (htps::htps_params *) params;
+    auto shared_thm = (std::shared_ptr<htps::theorem>) std::make_shared<htps::lean_theorem>(*c_thm);
+    tree->graph.set_root(shared_thm);
+    tree->graph.set_params(*c_params);
+    return 0;
+}
+
+static PyObject* PyHTPS_theorems_to_expand(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    std::vector<std::shared_ptr<htps::theorem>> thms = self->graph.theorems_to_expand();
+    PyObject *list = PyList_New(thms.size());
+    if (!list)
+        return PyErr_NoMemory();
+
+    for (size_t i = 0; i < thms.size(); i++) {
+        PyObject *pythm = Theorem_NewFromShared(thms[i]);
+        if (!pythm) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, pythm);
+    }
+    return list;
+}
+
+static PyObject* PyHTPS_expand_and_backup(PyHTPS *self, PyObject *args) {
+    PyObject *py_expansions;
+    if (!PyArg_ParseTuple(args, "O", &py_expansions)) {
+        PyErr_SetString(PyExc_TypeError, "expand_and_backup expects an iterable of EnvExpansion objects");
+        return NULL;
+    }
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions;
+    PyObject *iterator = PyObject_GetIter(py_expansions);
+    if (!iterator) {
+    PyErr_SetString(PyExc_TypeError, "Provided object is not iterable");
+    return NULL;
+    }
+    PyObject *item;
+    while ((item = PyIter_Next(iterator)) != NULL) {
+        if (!PyObject_TypeCheck(item, &EnvExpansionType)) {
+            PyErr_SetString(PyExc_TypeError, "each item in the iterable must be an EnvExpansion object");
+            Py_DECREF(item);
+            Py_DECREF(iterator);
+            return NULL;
+        }
+        auto *exp = (PyEnvExpansion *) item;
+        std::shared_ptr<htps::env_expansion> shared_exp(
+            &exp->expansion,
+            [](htps::env_expansion*) {
+                // no deletion: the memory is owned by the Python object.
+            }
+        );
+        //expansions.push_back(std::make_shared<htps::env_expansion>(exp->expansion));
+        expansions.push_back(shared_exp);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iterator);
+    self->graph.expand_and_backup(expansions);
+    Py_RETURN_NONE;
+}
+
+static PyObject* PyHTPS_is_proven(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    return self->graph.is_proven() ? Py_True : Py_False;
+}
+
+
+static PyMethodDef HTPS_methods[] = {
+    {"theorems_to_expand", (PyCFunction)PyHTPS_theorems_to_expand, METH_NOARGS, "Returns a list of subsequent theorems to expand"},
+    {"expand_and_backup", (PyCFunction)PyHTPS_expand_and_backup, METH_VARARGS,  "Expands and backups using the provided list of EnvExpansion objects"},
+    {"proven", (PyCFunction)PyHTPS_is_proven, METH_NOARGS, "Whether the start theorem is proven or not"},
+    {NULL, NULL, 0, NULL}
+};
+
+static PyTypeObject HTPSType = {
+    PyObject_HEAD_INIT(NULL) "htps.HTPS",
+    sizeof(PyHTPS),
+    0,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Py_TPFLAGS_DEFAULT,
+    "The HyperTreeProofSearch",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    HTPS_methods,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    (initproc)HTPS_init,
+    NULL,
+    (newfunc)HTPS_new,
+    };
+
+
 extern "C"
 PyMODINIT_FUNC
 PyInit_htps(void) {
@@ -1174,6 +2180,108 @@ PyInit_htps(void) {
         return NULL;
     }
 
+    if (PyType_Ready(&EnvEffectType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        return NULL;
+    }
+
+    Py_INCREF(&EnvEffectType);
+    if (PyModule_AddObject(m, "EnvEffect", (PyObject *) &EnvEffectType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_XDECREF(&EnvEffectType);
+        return NULL;
+    }
+
+
+    if (PyType_Ready(&EnvExpansionType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        return NULL;
+    }
+
+    Py_INCREF(&EnvExpansionType);
+    if (PyModule_AddObject(m, "EnvExpansion", (PyObject *) &EnvExpansionType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        Py_XDECREF(&EnvExpansionType);
+        return NULL;
+    }
+
+    if (PyType_Ready(&HTPSType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        Py_DECREF(&EnvExpansionType);
+        return NULL;
+    }
+
+    Py_INCREF(&HTPSType);
+    if (PyModule_AddObject(m, "HTPS", (PyObject *) &HTPSType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        Py_DECREF(&EnvExpansionType);
+        Py_XDECREF(&HTPSType);
+        return NULL;
+    }
 
     return m;
 }

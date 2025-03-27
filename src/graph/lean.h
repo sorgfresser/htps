@@ -59,7 +59,7 @@ namespace htps {
 
         void tokenize(std::vector<std::string> &tokens) const override; //inplace
 
-        void set_context(const lean_context ctx);
+        void set_context(const lean_context& ctx);
 
         void reset_tactics();
 

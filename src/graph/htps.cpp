@@ -14,7 +14,9 @@ using namespace htps;
 std::mt19937 htps::setup_gen() {
     std::random_device rd;
     size_t seed = std::getenv("SEED") ? std::stoi(std::getenv("SEED")) : rd();
-    std::cout << "Seed: " << seed << std::endl;
+#ifdef VERBOSE_PRINTS
+    printf("Seed: %i", seed);
+#endif
     return std::mt19937(seed);
 }
 
@@ -229,7 +231,6 @@ void Simulation::set_virtual_count_added(const std::shared_ptr<theorem> &thm, bo
 }
 
 bool Simulation::should_backup() const {
-    assert(expansions >= 0);
     return expansions == 0;
 }
 
@@ -258,6 +259,10 @@ void Simulation::reset_expansions() {
 
 void Simulation::increment_expansions() {
     expansions += 1;
+}
+
+size_t Simulation::num_tactics() {
+    return tactics.size();
 }
 
 void HTPSNode::reset_HTPS_stats() {
@@ -335,7 +340,7 @@ void HTPSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
             if (counts[id] == 0) {
                 q_values.push_back(tactic_init_value);
             } else {
-                q_values.push_back(std::exp(log_w[id]) / counts[id]);
+                q_values.push_back(std::exp(log_w[id]) / static_cast<double>(counts[id]));
             }
         }
     }
@@ -387,7 +392,7 @@ void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
         // If the node is solved, take the uniform distribution over all solving tactics
     else {
         valid_targets.resize(selected_tactic_ids.size());
-        std::fill(valid_targets.begin(), valid_targets.begin(), 1.0 / tactics.size());
+        std::fill(valid_targets.begin(), valid_targets.begin(), 1.0 / static_cast<double>(tactics.size()));
     }
     assert(selected_tactic_ids.size() == valid_targets.size());
     assert(selected_tactic_ids.size() == valid_priors.size());
@@ -416,7 +421,6 @@ std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, Nod
             break;
         default:
             throw std::runtime_error("Invalid node mask");
-            break;
     }
 
     std::vector<std::shared_ptr<tactic>> valid_tactics;
@@ -543,7 +547,7 @@ double HTPSNode::get_value() const {
         return 0.0;
     if (is_terminal())
         return MIN_FLOAT;
-    size_t visit_sum = std::accumulate(counts.begin(), counts.end(), 0);
+    size_t visit_sum = std::accumulate(counts.begin(), counts.end(), 0ul);
     if (visit_sum == 0) {
         assert (log_critic_value <= 0);
         return std::min(0.0, log_critic_value);
@@ -593,8 +597,8 @@ bool HTPSNode::has_virtual_count(size_t tactic_id) const {
 }
 
 void HTPSNode::subtract_virtual_count(size_t tactic_id, size_t count) {
+    assert(virtual_counts[tactic_id] >= count);
     virtual_counts[tactic_id] -= count;
-    assert(virtual_counts[tactic_id] >= 0);
 }
 
 bool HTPSNode::has_virtual_count() const {
@@ -696,6 +700,9 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         if (!nodes.contains(current)) {
             // TODO: in theory there is some depth stuff here?
             to_expand.push_back(current);
+#ifdef VERBOSE_PRINTS
+            printf("Adding to to_expand...\n");
+#endif
             continue;
         }
         auto HTPS_node = nodes.at(current);
@@ -734,6 +741,9 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         }
         assert(!HTPS_node->killed(tactic_id));
         auto tactic_ptr = HTPS_node->get_tactic(tactic_id);
+#ifdef VERBOSE_PRINTS
+        printf("Setting tactic %i\n", tactic_id);
+#endif
         sim.set_tactic(current, tactic_ptr);
         sim.set_tactic_id(current, tactic_id);
         auto children = HTPS_node->get_children_for_tactic(tactic_id);
@@ -762,6 +772,9 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
                        [this](const auto &thm) { return !this->nodes.contains(thm); }));
     assert(sim.leave_count() == all_leaves.size());
     for (const auto &thm: all_leaves) {
+#ifdef VERBOSE_PRINT
+        printf("Erasing theorem set\n");
+#endif
         sim.erase_theorem_set(thm);
     }
     return sim;
@@ -784,6 +797,9 @@ void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
 
     for (const auto &expansion: expansions) {
         if (expansion->is_error()) {
+#ifdef VERBOSE_PRINTS
+            printf("Is error");
+#endif
             HTPSNode current = HTPSNode(
                     expansion->thm, {}, {}, policy, {}, params.exploration, MIN_FLOAT,
                     params.q_value_solved, params.tactic_init_value, expansion->effects);
@@ -797,6 +813,9 @@ void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
         assert(!expansion->priors.empty());
         // If one tactic solves, all tactics of the expansion should solve
         if (expansion->children_for_tactic.at(0).empty()) {
+#ifdef VERBOSE_PRINTS
+            printf("Solved!");
+#endif
             assert(std::all_of(expansion->children_for_tactic.begin(), expansion->children_for_tactic.end(),
                                [](const auto &children) {
                                    return children.empty();
@@ -931,6 +950,9 @@ void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
         std::vector<std::shared_ptr<theorem>> to_expand;
         Simulation sim = find_leaves_to_expand(terminal, to_expand);
         if (to_expand.empty()) {
+#ifdef VERBOSE_PRINTS
+            printf("To expand is empty!");
+#endif
             break;
         }
         _single_to_expand(single_to_expand, sim, to_expand);
@@ -954,6 +976,9 @@ void HTPS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Si
     TheoremSet seen;
     std::shared_ptr<Simulation> sim_ptr = std::make_shared<Simulation>(sim);
     sim_ptr->reset_expansions();
+#ifdef VERBOSE_PRINTS
+    printf("Adding simulation!");
+#endif
     simulations.push_back(sim_ptr);
     for (const auto &leaf: leaves_to_expand) {
         if (!seen.contains(leaf)) {
@@ -1036,7 +1061,23 @@ HTPSResult HTPS::get_result() {
     return {samples_critic, samples_tactics, samples_effects, params.metric, proof_samples_tactics, root, p};
 }
 
-struct proof HTPSResult::get_proof() const {
+void HTPS::set_root(std::shared_ptr<theorem> &thm) {
+    if (!nodes.empty()) {
+        throw std::runtime_error("HTPS has already started, can't set root!");
+    }
+    root = thm;
+    ancestors.add_ancestor(root, nullptr, 0);
+    permanent_ancestors.add_ancestor(root, nullptr, 0);
+    unexplored_theorems.insert(*root);
+}
+
+void HTPS::set_params(const htps_params &new_params) {
+    params = new_params;
+    policy = std::make_shared<Policy>(params.policy_type, params.exploration);
+}
+
+
+proof HTPSResult::get_proof() const {
     return p;
 }
 

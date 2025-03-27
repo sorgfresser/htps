@@ -18,7 +18,7 @@ jobs:
     container:
       env:
         PLAT: ${{ env.PLAT }}
-      image: quay.io/pypa/${{ env.PLAT }}
+      image: "quay.io/pypa/manylinux_2_28_x86_64"
       volumes:
         - ${{ github.workspace }}:/io
       options: --workdir /io

@@ -48,8 +48,6 @@ namespace htps {
         void get_children(std::vector<std::shared_ptr<theorem>> &children) const;
 
         std::vector<std::shared_ptr<theorem>> get_children() const;
-
-        size_t size_goal() const;
     };
 
     class HTPSSampleCritic {
@@ -69,8 +67,6 @@ namespace htps {
             assert(q_estimate >= 0);
             assert(q_estimate <= 1 + 1e-4);
         }
-
-        size_t size_goal() const;
     };
 
     enum InProof {
@@ -102,13 +98,6 @@ namespace htps {
             assert(inproof != InProofCount);
             assert(!tactics.empty());
         }
-
-
-        size_t size_goal() const;
-
-        /* Average size of tokenized tactics. Note that this will be an integer, i.e. we drop the remainder.
-         * */
-        size_t avg_size_tactic() const;
     };
 
 

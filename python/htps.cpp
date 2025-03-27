@@ -1,6 +1,6 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
-#include <descrobject.h>
+#include <structmember.h>
 #include "../src/graph/htps.h"
 #include "../src/graph/lean.h"
 
@@ -334,24 +334,24 @@ static int Params_set_node_mask(PyObject * self, PyObject * value, void* closure
 }
 
 static PyMemberDef Params_members[] = {
-    {"exploration",         Py_T_DOUBLE,  offsetof(htps::htps_params, exploration),         0, "exploration parameter"},
-    {"num_expansions",      Py_T_ULONG,   offsetof(htps::htps_params, num_expansions),      0, "max number of expansions"},
-    {"succ_expansions",     Py_T_ULONG,   offsetof(htps::htps_params, succ_expansions),     0, "expansions per batch"},
-    {"early_stopping",      Py_T_BOOL,     offsetof(htps::htps_params, early_stopping),      0, "early stopping flag"},
-    {"no_critic",           Py_T_BOOL,     offsetof(htps::htps_params, no_critic),           0, "no critic flag"},
-    {"backup_once",         Py_T_BOOL,     offsetof(htps::htps_params, backup_once),         0, "backup once flag"},
-    {"backup_one_for_solved",Py_T_BOOL,    offsetof(htps::htps_params, backup_one_for_solved),0, "backup one for solved flag"},
-    {"depth_penalty",       Py_T_DOUBLE,  offsetof(htps::htps_params, depth_penalty),       0, "depth penalty"},
-    {"count_threshold",     Py_T_ULONG,   offsetof(htps::htps_params, count_threshold),     0, "count threshold"},
-    {"tactic_p_threshold",  Py_T_BOOL,     offsetof(htps::htps_params, tactic_p_threshold),  0, "tactic p threshold flag"},
-    {"tactic_sample_q_conditioning", Py_T_BOOL, offsetof(htps::htps_params, tactic_sample_q_conditioning), 0, "tactic sample q conditioning flag"},
-    {"only_learn_best_tactics", Py_T_BOOL, offsetof(htps::htps_params, only_learn_best_tactics), 0, "only learn best tactics flag"},
-    {"tactic_init_value",   Py_T_DOUBLE,  offsetof(htps::htps_params, tactic_init_value),   0, "tactic initial value"},
-    {"policy_temperature",  Py_T_DOUBLE,  offsetof(htps::htps_params, policy_temperature),  0, "policy temperature"},
-    {"effect_subsampling_rate", Py_T_DOUBLE, offsetof(htps::htps_params, effect_subsampling_rate), 0, "effect subsampling rate"},
-    {"critic_subsampling_rate", Py_T_DOUBLE, offsetof(htps::htps_params, critic_subsampling_rate), 0, "critic subsampling rate"},
-    {"early_stopping_solved_if_root_not_proven", Py_T_BOOL, offsetof(htps::htps_params, early_stopping_solved_if_root_not_proven), 0, "early stopping solved flag"},
-    {"virtual_loss",        Py_T_ULONG,   offsetof(htps::htps_params, virtual_loss),        0, "virtual loss"},
+    {"exploration",         T_DOUBLE,  offsetof(htps::htps_params, exploration),         0, "exploration parameter"},
+    {"num_expansions",      T_ULONG,   offsetof(htps::htps_params, num_expansions),      0, "max number of expansions"},
+    {"succ_expansions",     T_ULONG,   offsetof(htps::htps_params, succ_expansions),     0, "expansions per batch"},
+    {"early_stopping",      T_BOOL,     offsetof(htps::htps_params, early_stopping),      0, "early stopping flag"},
+    {"no_critic",           T_BOOL,     offsetof(htps::htps_params, no_critic),           0, "no critic flag"},
+    {"backup_once",         T_BOOL,     offsetof(htps::htps_params, backup_once),         0, "backup once flag"},
+    {"backup_one_for_solved",T_BOOL,    offsetof(htps::htps_params, backup_one_for_solved),0, "backup one for solved flag"},
+    {"depth_penalty",       T_DOUBLE,  offsetof(htps::htps_params, depth_penalty),       0, "depth penalty"},
+    {"count_threshold",     T_ULONG,   offsetof(htps::htps_params, count_threshold),     0, "count threshold"},
+    {"tactic_p_threshold",  T_BOOL,     offsetof(htps::htps_params, tactic_p_threshold),  0, "tactic p threshold flag"},
+    {"tactic_sample_q_conditioning", T_BOOL, offsetof(htps::htps_params, tactic_sample_q_conditioning), 0, "tactic sample q conditioning flag"},
+    {"only_learn_best_tactics", T_BOOL, offsetof(htps::htps_params, only_learn_best_tactics), 0, "only learn best tactics flag"},
+    {"tactic_init_value",   T_DOUBLE,  offsetof(htps::htps_params, tactic_init_value),   0, "tactic initial value"},
+    {"policy_temperature",  T_DOUBLE,  offsetof(htps::htps_params, policy_temperature),  0, "policy temperature"},
+    {"effect_subsampling_rate", T_DOUBLE, offsetof(htps::htps_params, effect_subsampling_rate), 0, "effect subsampling rate"},
+    {"critic_subsampling_rate", T_DOUBLE, offsetof(htps::htps_params, critic_subsampling_rate), 0, "critic subsampling rate"},
+    {"early_stopping_solved_if_root_not_proven", T_BOOL, offsetof(htps::htps_params, early_stopping_solved_if_root_not_proven), 0, "early stopping solved flag"},
+    {"virtual_loss",        T_ULONG,   offsetof(htps::htps_params, virtual_loss),        0, "virtual loss"},
     {NULL}
 };
 
@@ -431,8 +431,8 @@ static int Hypothesis_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 static PyMemberDef HypothesisMembers[] = {
-    {"identifier", Py_T_STRING, offsetof(htps::hypothesis, identifier), Py_READONLY, "Identifier for a hypothesis"},
-    {"value", Py_T_STRING, offsetof(htps::hypothesis, type), Py_READONLY, "Type of the hypothesis"},
+    {"identifier", T_STRING, offsetof(htps::hypothesis, identifier), READONLY, "Identifier for a hypothesis"},
+    {"value", T_STRING, offsetof(htps::hypothesis, type), READONLY, "Type of the hypothesis"},
     {NULL}
 };
 
@@ -504,9 +504,9 @@ static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 
 static PyMemberDef TacticMembers[] = {
-    {"unique_string", Py_T_STRING, offsetof(htps::lean_tactic, unique_string), Py_READONLY, "Unique identifier for a tactic"},
-    {"is_valid", Py_T_BOOL, offsetof(htps::lean_tactic, is_valid), Py_READONLY, "Whether the tactic is valid or not"},
-    {"duration", Py_T_LONG, offsetof(htps::lean_tactic, duration), Py_READONLY, "Duration in milliseconds"},
+    {"unique_string", T_STRING, offsetof(htps::lean_tactic, unique_string), READONLY, "Unique identifier for a tactic"},
+    {"is_valid", T_BOOL, offsetof(htps::lean_tactic, is_valid), READONLY, "Whether the tactic is valid or not"},
+    {"duration", T_LONG, offsetof(htps::lean_tactic, duration), READONLY, "Duration in milliseconds"},
     {NULL}
 };
 
@@ -904,8 +904,8 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
 
 
 static PyMemberDef Theorem_members[] = {
-    {"conclusion", Py_T_STRING, offsetof(htps::lean_theorem, conclusion), Py_READONLY, "Conclusion of the theorem"},
-    {"unique_string", Py_T_STRING, offsetof(htps::lean_theorem, unique_string), Py_READONLY, "Unique string of the theorem"},
+    {"conclusion", T_STRING, offsetof(htps::lean_theorem, conclusion), READONLY, "Conclusion of the theorem"},
+    {"unique_string", T_STRING, offsetof(htps::lean_theorem, unique_string), READONLY, "Unique string of the theorem"},
     {NULL}
 };
 
@@ -1972,7 +1972,7 @@ PyInit_htps(void) {
     }
 
     HTPSError = PyErr_NewException("htps.error", NULL, NULL);
-    if (PyModule_AddObjectRef(m, "error", HTPSError) < 0) {
+    if (PyModule_AddObject(m, "error", HTPSError) < 0) {
         Py_CLEAR(HTPSError);
         Py_DECREF(m);
         return NULL;

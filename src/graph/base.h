@@ -20,11 +20,7 @@ namespace htps {
         bool is_valid;
         size_t duration; // duration in milliseconds
 
-        bool operator==(const tactic &t) const;
-
-        virtual std::vector<std::string> tokenize() const = 0;
-
-        virtual void tokenize(std::vector<std::string> &tokens) const = 0;
+        virtual bool operator==(const tactic &t) const = 0;
     };
 }
 
@@ -54,11 +50,7 @@ namespace htps {
         std::vector<hypothesis> hypotheses;
         std::string unique_string;
 
-        bool operator==(const theorem &t) const;
-
-        virtual std::vector<std::string> tokenize() const = 0;
-
-        virtual void tokenize(std::vector<std::string> &tokens) const = 0;
+        virtual bool operator==(const theorem &t) const = 0;
 
         theorem() = default;
 

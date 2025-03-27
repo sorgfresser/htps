@@ -54,7 +54,6 @@ Represents a theorem with a conclusion and hypotheses.
 - **Methods:**
     - `static theorem from_json(const std::string &json)`: Creates a `theorem` object from a JSON string.
     - `bool operator==(const theorem &t) const`: Equality operator.
-    - `virtual std::vector<std::string> tokenize() const`: Tokenizes the theorem (to be overridden in derived classes).
 
 ### `proof`
 
@@ -84,9 +83,6 @@ Represents a Lean theorem, extending the base `theorem` class.
 
 - **Attributes:**
     - `lean_context context`: Context for the theorem.
-
-- **Methods:**
-    - `std::vector<std::string> tokenize() const override`: Tokenizes the theorem.
 
 
 ## Design decisions

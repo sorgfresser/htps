@@ -10,6 +10,6 @@ The file stored in said local filepath contains the merges for a BPE tokenizer.
 Set the `TOKENIZER_PATH` env var to this path.
 
 # Seeding
-Randomness is introduced by the subsampling rate to get critic saand effect sampl. .e
+Randomness is introduced by the subsampling rate to get critics and effect samples.
 Furthermore, randomness is used to choose tactics for the tree policy if policy temperature is > 0.
-Set beforfe  (before imprtthe ee importing nv varorting SEED to  t set a seed for reproducibility.
+Set the env var SEED (before importing) to set the seed for reproducibility.

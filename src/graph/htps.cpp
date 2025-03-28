@@ -412,7 +412,7 @@ std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, Nod
     if (in_minimum_proof.get(metric)) {
         inproof = InProof::InMinimalProof;
     } else if (is_in_proof()) {
-        inproof = InProof::InProof;
+        inproof = InProof::IsInProof;
     } else {
         inproof = InProof::NotInProof;
     }
@@ -987,6 +987,7 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
             initial_minimum_proof_size.set(static_cast<Metric>(i),
                                            nodes.at(root)->minimum_length(static_cast<Metric>(i)));
             assert(initial_minimum_proof_size.has_value(static_cast<Metric>(i)));
+            assert(nodes.at(root)->is_in_minimum_proof(static_cast<Metric>(i)));
         }
         reset_minimum_proof_stats();
     }

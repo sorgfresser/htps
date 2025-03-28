@@ -17,12 +17,8 @@ public:
                  const std::vector<hypothesis> &hyps = {})
             : theorem(conclusion, hyps) {}
 
-    std::vector<std::string> tokenize() const override {
-        return {"dummy_token"};
-    }
-
-    void tokenize(std::vector<std::string> &tokens) const override {
-        tokens.emplace_back("dummy_token");
+    bool operator==(const theorem &t) const override {
+        return unique_string == t.unique_string;
     }
 };
 
@@ -34,12 +30,8 @@ public:
         duration = dur;
     }
 
-    std::vector<std::string> tokenize() const override {
-        return {"tactic_token"};
-    }
-
-    void tokenize(std::vector<std::string> &tokens) const override {
-        tokens.emplace_back("tactic_token");
+    bool operator==(const tactic &t) const override {
+        return unique_string == t.unique_string;
     }
 };
 
@@ -334,6 +326,46 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     to_expand = htps_instance->theorems_to_expand();
     EXPECT_TRUE(htps_instance->is_proven());
     EXPECT_TRUE(to_expand.empty());
+
+    // Get results
+    HTPSResult result = htps_instance->get_result();
+    EXPECT_TRUE(result.get_goal() == root);
+
+    // Check proof
+    struct proof p = result.get_proof();
+    EXPECT_TRUE(p.proof_theorem == root);
+    EXPECT_TRUE(p.proof_tactic ==dummyTac);
+    auto p_children = p.children;
+    EXPECT_TRUE(p_children.size() == 3);
+    const auto& p_child = p_children[0];
+    EXPECT_TRUE(p_child.proof_theorem == children[0]);
+    EXPECT_TRUE(p_child.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child.children.empty());
+    const auto &p_child2 = p_children[1];
+    EXPECT_TRUE(p_child2.proof_theorem == children[1]);
+    EXPECT_TRUE(p_child2.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child2.children.size() == 1);
+    const auto &p_child3 = p_children[2];
+    EXPECT_TRUE(p_child3.proof_theorem == children[2]);
+    EXPECT_TRUE(p_child3.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child3.children.size() == 1);
+    const auto &p_child4 = p_child2.children[0];
+    EXPECT_TRUE(p_child4.proof_theorem == child3);
+    EXPECT_TRUE(p_child4.proof_tactic == dummyTac2);
+    EXPECT_TRUE(p_child4.children.empty());
+    const auto &p_child5 = p_child3.children[0];
+    EXPECT_TRUE(p_child5.proof_theorem == child4);
+    EXPECT_TRUE(p_child5.proof_tactic == dummyTac2);
+    EXPECT_TRUE(p_child5.children.empty());
+
+    // Check samples
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    EXPECT_TRUE(metric == dummyParams.metric);
+    EXPECT_FALSE(samples_critic.empty());
+    EXPECT_TRUE(samples_critic.size() == 6);
+    EXPECT_TRUE(samples_tactic.size() == 6);
+    EXPECT_TRUE(samples_effect.size() == 6);
+    EXPECT_TRUE(proof_samples_tactics.size() == 6);
 }
 
 TEST_F(HTPSTest, TestBackupOnce) {

@@ -4,12 +4,14 @@ from htps import *
 
 
 def _compare_hypotheses(ha, hb):
-    for orig, new in zip(ha, hb, strict=True):
+    assert len(ha) == len(hb)
+    for orig, new in zip(ha, hb):
         assert new.identifier == orig.identifier
         assert new.value == orig.value
 
 def _compare_tactics(ta, tb):
-    for orig, new in zip(ta, tb, strict=True):
+    assert len(ta) == len(tb)
+    for orig, new in zip(ta, tb):
         assert new.unique_string == orig.unique_string
         assert new.is_valid == orig.is_valid
         assert new.duration == orig.duration

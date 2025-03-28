@@ -3,7 +3,6 @@
 #include <vector>
 #include <algorithm>
 #include "../json.hpp"
-#include "../model/specialtokens.h"
 
 using namespace htps;
 
@@ -12,20 +11,8 @@ bool hypothesis::operator==(const hypothesis &h) const {
 }
 
 
-bool theorem::operator==(const theorem &t) const {
-    return unique_string == t.unique_string;
-}
-
-bool tactic::operator==(const tactic &t) const {
-    return unique_string == t.unique_string;
-}
-
 std::size_t std::hash<tactic>::operator()(const tactic &t) const {
     return std::hash<std::string>{}(t.unique_string);
-}
-
-std::vector<std::string> tactic::tokenize() const {
-    throw std::invalid_argument("Not implemented");
 }
 
 
@@ -35,11 +22,6 @@ hypothesis hypothesis::from_json(const std::string &json) {
     h.identifier = j["identifier"];
     h.type = j["type"];
     return h;
-}
-
-
-std::vector<std::string> theorem::tokenize() const {
-    throw std::invalid_argument("Not implemented");
 }
 
 std::string theorem::get_unique_string(const std::string &conclusion, const std::vector<hypothesis> &hypotheses) {

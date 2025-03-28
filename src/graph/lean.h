@@ -28,19 +28,13 @@ namespace htps {
         lean_context(lean_context &&) = default;
 
         lean_context(std::set<std::string> namespaces) : namespaces(std::move(namespaces)) {}
-
-        std::vector<std::string> tokenize() const;
-
-        void tokenize(std::vector<std::string> &tokens) const; //inplace
     };
 
     struct lean_tactic : public tactic {
 #ifdef PYTHON_BINDINGS
         PyObject_HEAD
 #endif
-        std::vector<std::string> tokenize() const override;
-
-        void tokenize(std::vector<std::string> &tokens) const override;
+        bool operator==(const tactic &t) const override;
 
         ~lean_tactic() = default;
     };
@@ -54,11 +48,6 @@ namespace htps {
         lean_context context;
         std::vector<lean_tactic> past_tactics;
 
-        /* Tokenize a theorem. Will have the structure <Namespace-Info> <Goal> <PastTactics> */
-        std::vector<std::string> tokenize() const override;
-
-        void tokenize(std::vector<std::string> &tokens) const override; //inplace
-
         void set_context(const lean_context& ctx);
 
         void reset_tactics();
@@ -67,6 +56,7 @@ namespace htps {
 
         lean_theorem() = default;
 
+        bool operator==(const theorem &t) const override;
     };
 }
 

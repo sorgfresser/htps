@@ -1,0 +1,36 @@
+name: Build Wheels
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  PLAT: manylinux_2_28_x86_64
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      env:
+        PLAT: ${{ env.PLAT }}
+      image: "quay.io/pypa/manylinux_2_28_x86_64"
+      volumes:
+        - ${{ github.workspace }}:/io
+      options: --workdir /io
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Build wheels
+        run: /bin/bash scripts/build-wheels.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: wheelhouse/*
+          name: wheels

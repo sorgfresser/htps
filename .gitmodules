@@ -1,6 +1,3 @@
-[submodule "Tokenizer"]
-	path = external/Tokenizer
-	url = https://github.com/sorgfresser/Tokenizer
 [submodule "glob"]
 	path = external/glob
 	url = https://github.com/p-ranav/glob

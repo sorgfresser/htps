@@ -1,0 +1,5 @@
+build
+setuptools
+wheel
+sphinx
+pytest

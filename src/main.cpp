@@ -1,7 +1,6 @@
 #include "./graph/base.h"
 #include <iostream>
 #include <string>
-#include "tokenization/tokenizer.h"
 
 using namespace htps;
 
@@ -79,12 +78,6 @@ int main() {
 ////    ht.propagate_proven(node.proof_theorem);
 //    proof p = ht.get_proof();
 //    std::cout << p.proof_theorem.conclusion << std::endl;
-
-    std::vector<std::string> tokens;
-    global_tokenizer.tokenize("Hello, world! U <UNPROVED> fghz--r8*", tokens, false);
-    for (const auto &token: tokens) {
-        std::cout << token << " ";
-    }
     return 0;
 }
 

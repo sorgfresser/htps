@@ -39,35 +39,6 @@ void HTPSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &child
     children_vec = children;
 }
 
-size_t HTPSSampleEffect::size_goal() const {
-    if (!goal) {
-        throw std::runtime_error("Goal is null, cannot get size");
-    }
-    return (goal->tokenize()).size();
-}
-
-size_t HTPSSampleCritic::size_goal() const {
-    if (!goal) {
-        throw std::runtime_error("Goal is null, cannot get size");
-    }
-    return (goal->tokenize()).size();
-}
-
-size_t HTPSSampleTactics::size_goal() const {
-    if (!goal) {
-        throw std::runtime_error("Goal is null, cannot get size");
-    }
-    return (goal->tokenize()).size();
-}
-
-size_t HTPSSampleTactics::avg_size_tactic() const {
-    size_t sum = 0;
-    for (const auto &tactic: tactics) {
-        sum += tactic->tokenize().size();
-    }
-
-    return sum / tactics.size();
-}
 
 std::vector<std::shared_ptr<theorem>> Simulation::leaves() const {
     std::vector<std::shared_ptr<theorem>> result;

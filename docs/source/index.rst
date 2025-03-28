@@ -35,7 +35,7 @@ Conjecture Generation
 
 Generate and explore new theorem statements with ease. Each new conjecture can initialise a fresh search object, integrating into your existing tactic generation and environment processing pipeline.
 
----
+
 
 With **open-htps**, tree search complexities are minimized, empowering you to advance swiftly through your research's creative and innovative components.
 
@@ -45,5 +45,6 @@ Contents
    :maxdepth: 2
 
    python/overview
+   python/params
    python/htps
    cpp/htps

@@ -219,6 +219,78 @@ def test_env_expansion():
     assert expansion.error is None, "error field should be None"
     assert expansion.is_error == False, "is_error should be False"
 
+def test_htps_sample_effect():
+    context = Context(["∧", "", " "])
+    hypotheses = [Hypothesis("H1", "A"), Hypothesis("H2", "B"), Hypothesis("H3", "C"), Hypothesis("H4", "D")]
+
+    tactics = [Tactic("tac1", True, 5), Tactic("tac2", True, 10)]
+    goal = Theorem("goal_conclusion", "goal_unique", hypotheses, context, tactics)
+    tac = Tactic("effect_tac", True, 15)
+    effect = SampleEffect(goal, tac, [])
+    _compare_theorem(effect.goal, goal)
+    _compare_tactics([effect.tactic], [tac])
+    assert effect.children == []
+    new_goal = Theorem("new_goal_conclusion", "new_goal_unique", hypotheses, context, tactics)
+    effect = SampleEffect(goal, tac, [new_goal])
+    assert len(effect.children) == 1
+    _compare_theorem(effect.children[0], new_goal)
+
+def test_htps_sample_critic():
+    context = Context(["∧", ""])
+    hypotheses = [Hypothesis("H1", "X"), Hypothesis("H2", "Y")]
+    tactics = [Tactic("tac1", True, 5)]
+    goal = Theorem("critic_goal", "critic_unique", hypotheses, context, tactics)
+    critic = SampleCritic(goal, 0.8, True, False, 0.3, 42)
+    _compare_theorem(critic.goal, goal)
+    assert critic.q_estimate == 0.8, "q_estimate mismatch"
+    assert critic.solved is True, "solved flag mismatch"
+    assert critic.bad is False, "bad flag mismatch"
+    assert critic.critic == 0.3, "critic mismatch"
+    assert critic.visit_count == 42, "visit_count mismatch"
+
+def test_htps_sample_tactics():
+    context = Context(["∧"])
+    hypotheses = [Hypothesis("H1", "X")]
+    tactics = [Tactic("tac1", True, 5), Tactic("tac2", False, 10)]
+    goal = Theorem("tactic_goal", "tactic_unique", hypotheses, context, tactics)
+    target_pi = [0.6, 0.4]
+    q_estimates = [0.7, 0.2]
+    inproof = InProof.InProof
+    visit_count = 100
+    sample_tactics = SampleTactics(goal, tactics, target_pi, inproof, q_estimates, visit_count)
+    _compare_theorem(sample_tactics.goal, goal)
+    for i, tac in enumerate(sample_tactics.tactics):
+        assert tac.unique_string == tactics[i].unique_string, f"tactic {i} unique_string mismatch"
+        assert tac.is_valid == tactics[i].is_valid, f"tactic {i} is_valid mismatch"
+        assert tac.duration == tactics[i].duration, f"tactic {i} duration mismatch"
+
+    assert sample_tactics.target_pi == target_pi, "target_pi mismatch"
+    assert sample_tactics.inproof == inproof, "inproof mismatch"
+    assert sample_tactics.q_estimates == q_estimates, "q_estimates mismatch"
+    assert sample_tactics.visit_count == visit_count, "visit_count mismatch"
+
+    visit_count = -100
+    with pytest.raises(ValueError):
+        SampleTactics(goal, tactics, target_pi, inproof, q_estimates, visit_count)
+
+def test_proof():
+    context = Context(["∧", ""])
+    hypotheses = [Hypothesis("H1", "A"), Hypothesis("H2", "B")]
+    tactics = [Tactic("tac1", True, 5)]
+    thm = Theorem("thm_conclusion", "thm_unique", hypotheses, context, tactics)
+    tac = Tactic("tac_main", True, 10)
+    proof_obj = Proof(theorem=thm, tactic=tac, children=[])
+
+    _compare_theorem(proof_obj.proof_theorem, thm)
+    assert proof_obj.proof_tactic.unique_string == tac.unique_string
+    assert proof_obj.children == []
+
+    child_proof = Proof(theorem=thm, tactic=tac, children=[])
+    proof_obj2 = Proof(theorem=thm, tactic=tac, children=[child_proof])
+    assert len(proof_obj2.children) == 1
+    _compare_theorem(proof_obj2.children[0].proof_theorem, thm)
+    _compare_tactics([proof_obj2.children[0].proof_tactic], [tac])
+    assert proof_obj2.children[0].children == []
 
 
 def test_htps_basic():

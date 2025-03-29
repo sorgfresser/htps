@@ -1,0 +1,68 @@
+name: Build and Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  PLAT: manylinux_2_28_x86_64
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      env:
+        PLAT: ${{ env.PLAT }}
+      image: "quay.io/pypa/manylinux_2_28_x86_64"
+      volumes:
+        - ${{ github.workspace }}:/io
+      options: --workdir /io
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Build wheels
+        run: /bin/bash scripts/build-wheels.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: wheelhouse/*
+          name: wheels
+
+  publish_python:
+    name: Publish Python
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'false'
+
+      - name: Download wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: wheelhouse
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: Publish to PyPI
+        run: |
+          python -m twine upload --repository testpypi wheelhouse/*
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

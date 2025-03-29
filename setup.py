@@ -33,5 +33,5 @@ setup(
     ],
     ext_modules=[module],
     description="Open-source implementation of HyperTree Proof Search",
-    version="0.0.2",
+    version="0.0.3",
 )

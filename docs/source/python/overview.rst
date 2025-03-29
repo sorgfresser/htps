@@ -47,6 +47,10 @@ In addition to the theorem, the search requires a set of parameters, which will 
 
    from htps import HTPS
    search = HTPS(theorem, params)
+   while not search.is_done():
+       """Get theorems, generate tactics, and pass them to the environment.
+          Report the results back to the search algorithm."""
+
 
 To get new theorems for which tactics should be generated, call the ``theorems_to_expand`` method.
 This method returns a list of ``Theorem`` objects, each one goal, for which tactics shoould be generated (called expand).

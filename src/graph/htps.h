@@ -568,6 +568,8 @@ namespace htps {
 
         bool dead_root() const override;
 
+        bool is_done() const;
+
         Simulation find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
                                          std::vector<std::shared_ptr<theorem>> &to_expand);
 

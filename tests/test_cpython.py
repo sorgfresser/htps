@@ -417,6 +417,7 @@ def test_htps_expansion():
     expansion = EnvExpansion(theorem2, 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
     search.expand_and_backup([expansion])
     assert search.proven()
+    assert search.is_done()
 
     # Get result
     result = search.get_result()

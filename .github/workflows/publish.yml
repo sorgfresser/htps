@@ -33,7 +33,7 @@ jobs:
 
       - name: Publish to PyPI
         run: |
-          python -m twine upload --repository testpypi --non-interactive --verbose dist/*
+          python -m twine upload --non-interactive --verbose dist/*
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

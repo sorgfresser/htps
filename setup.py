@@ -29,10 +29,9 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
-        "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
     ],
     ext_modules=[module],
     description="Open-source implementation of HyperTree Proof Search",
-    version="0.1.0",
+    version="0.0.1",
 )

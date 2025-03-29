@@ -11,6 +11,7 @@ function repair_wheel {
 }
 
 yum install -y libffi libffi-devel
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Compile wheels
 for PYBIN in /opt/python/*/bin; do

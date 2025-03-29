@@ -21,7 +21,7 @@ with open(os.path.join(directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="htps",
-    include_dirs=[],
+    include_dirs=["src", "python", "external/glob/single_include"],
     setup_requires=[],
     license="Apache-2.0",
     license_files=("LICENSE",),

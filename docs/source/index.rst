@@ -45,6 +45,7 @@ Contents
    :maxdepth: 2
 
    python/overview
+   python/results
    python/params
    python/htps
    cpp/htps

@@ -387,6 +387,10 @@ def test_htps_expansion():
     params = SearchParams(0.3, PolicyType.RPO, 10, 3, True, True, True, True, 0.99, 10, True, True, True, 0.0, QValueSolved.One, 0.7, Metric.Time, NodeMask.NoMask, 1.0, 1.0, True, 1)
     search = HTPS(theorem, params)
     print(theorem)
+    assert theorem.metadata == {}
+    theorem.metadata = {"key": "value"}
+    assert theorem.metadata == {"key": "value"}
+    theorem.metadata = {}
     # Will find the root
     theorems = search.theorems_to_expand()
     env_durations = [1, 1]

@@ -47,6 +47,9 @@ namespace htps {
     public:
         lean_context context;
         std::vector<lean_tactic> past_tactics;
+#ifdef PYTHON_BINDINGS
+        PyObject *py_dict;
+#endif
 
         void set_context(const lean_context& ctx);
 

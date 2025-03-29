@@ -699,10 +699,26 @@ NULL,
 };
 
 
+static void Theorem_dealloc(PyObject *self) {
+    auto *thm = (htps::lean_theorem *) self;
+    thm->conclusion.~basic_string();
+    thm->hypotheses.~vector();
+    thm->unique_string.~basic_string();
+    thm->context.~lean_context();
+    thm->past_tactics.~vector();
+    Py_XDECREF(thm->py_dict);
+    Py_TYPE(self)->tp_free(self);
+}
+
 static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
     auto *self = (htps::lean_theorem *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
+        return NULL;
+    }
+    self->py_dict = PyDict_New();
+    if (self->py_dict == NULL) {
+        Py_DECREF(self);
         return NULL;
     }
     new (&(self->conclusion)) std::string();
@@ -910,6 +926,28 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
     return 0;
 }
 
+static PyObject *Theorem_get_dict(PyObject *self, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    Py_INCREF(thm->py_dict);
+    return thm->py_dict;
+}
+
+static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
+    auto *thm = (htps::lean_theorem *) self;
+    if (value == NULL) {
+        PyErr_SetString(PyExc_TypeError, "new dictionary is not set");
+        return -1;
+    }
+    if (!PyDict_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "new dictionary must be a dict");
+        return -1;
+    }
+    Py_XDECREF(thm->py_dict);
+    Py_INCREF(value);
+    thm->py_dict = value;
+    return 0;
+}
+
 
 
 static PyMemberDef Theorem_members[] = {
@@ -922,6 +960,7 @@ static PyGetSetDef Theorem_getsetters[] = {
     {"context", Theorem_get_context, Theorem_set_context, "Context of the theorem", NULL},
     {"hypotheses", Theorem_get_hypotheses, Theorem_set_hypotheses, "Hypotheses of theorem", NULL},
     {"past_tactics", Theorem_get_past_tactics, Theorem_set_past_tactics, "Past tactics of theorem", NULL},
+    {"metadata", Theorem_get_dict, Theorem_set_dict, "Metadata dictionary", NULL},
     {NULL}
 };
 
@@ -929,7 +968,7 @@ static PyTypeObject TheoremType = {
     PyObject_HEAD_INIT(NULL) "htps.Theorem",
 sizeof(htps::lean_theorem),
 0,
-NULL,
+(destructor)Theorem_dealloc,
 NULL,
 NULL,
 NULL,

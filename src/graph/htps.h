@@ -354,13 +354,13 @@ namespace htps {
 
         void get_tactics_sample_q_conditioning(size_t count_threshold,
                                                std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                               std::vector<double> &valid_priors, std::vector<double> &valid_targets,
+                                               std::vector<double> &valid_targets,
                                                std::vector<double> &q_values) const;
 
         void
         get_tactics_sample_regular(Metric metric, NodeMask node_mask, bool only_learn_best_tactics, double p_threshold,
                                    std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                   std::vector<double> &valid_priors, std::vector<double> &valid_targets) const;
+                                   std::vector<double> &valid_targets) const;
 
         bool _validate() const;
 
@@ -460,12 +460,24 @@ namespace htps {
                 metric(metric), proof_samples_tactics(proof_samples_tactics), goal(goal),
                 p(p) {}
 
+        HTPSResult() = default;
+
         struct proof get_proof() const;
 
         std::shared_ptr<theorem> get_goal() const;
 
+        Metric get_metric() const;
+
         std::tuple<std::vector<HTPSSampleCritic>, std::vector<HTPSSampleTactics>, std::vector<HTPSSampleEffect>, Metric, std::vector<HTPSSampleTactics>>
         get_samples() const;
+
+        std::vector<HTPSSampleTactics> get_proof_samples() const;
+
+        std::vector<HTPSSampleCritic> get_critic_samples() const;
+
+        std::vector<HTPSSampleTactics> get_tactic_samples() const;
+
+        std::vector<HTPSSampleEffect> get_effect_samples() const;
     };
 
 /**

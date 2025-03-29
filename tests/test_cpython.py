@@ -22,6 +22,37 @@ def _compare_theorem(a, b):
     _compare_hypotheses(a.hypotheses, b.hypotheses)
     _compare_tactics(a.past_tactics, b.past_tactics)
 
+def _compare_critic_samples(a, b):
+    assert len(a) == len(b)
+    for orig, new in zip(a, b):
+        _compare_theorem(orig.goal, new.goal)
+        assert new.q_estimate == orig.q_estimate
+        assert new.solved == orig.solved
+        assert new.bad == orig.bad
+        assert new.critic == orig.critic
+        assert new.visit_count == orig.visit_count
+
+def _compare_tactic_samples(a, b):
+    assert len(a) == len(b)
+    for orig, new in zip(a, b):
+        _compare_theorem(orig.goal, new.goal)
+        assert new.target_pi == orig.target_pi
+        assert new.inproof == orig.inproof
+        assert new.q_estimates == orig.q_estimates
+        assert new.visit_count == orig.visit_count
+        _compare_tactics(orig.tactics, new.tactics)
+
+def _compare_effect_samples(a, b):
+    assert len(a) == len(b)
+    for orig, new in zip(a, b):
+        _compare_theorem(orig.goal, new.goal)
+        _compare_tactics([orig.tactic], [new.tactic])
+        assert len(orig.children) == len(new.children)
+        for orig_child, new_child in zip(orig.children, new.children):
+            _compare_theorem(orig_child, new_child)
+
+
+
 
 def test_params():
     params =SearchParams(0.3, PolicyType.RPO, 10, 3, True, True, True, True, 0.99, 10, True, True, True, 0.0, QValueSolved.One, 0.7, Metric.Time, NodeMask.NoMask, 1.0, 1.0, True, 1)
@@ -179,7 +210,13 @@ def test_env_expansion():
     log_critic = 1.234
     expansion_tactics = [tactic_a, tactic_b]
     children_for_tactic = [[goal], []]
-    priors = [0.5, 0.7]
+    priors = [0.4, 0.6]
+    with pytest.raises(ValueError):
+        wrong_prior = [0.4, 0.6, 0.1]
+        EnvExpansion(goal, expander_duration, generation_duration, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, wrong_prior)
+    with pytest.raises(ValueError):
+        wrong_prior = [0.4, 0.8]
+        EnvExpansion(goal, expander_duration, generation_duration, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, wrong_prior)
     expansion = EnvExpansion(
         thm=goal,
         expander_duration=expander_duration,
@@ -207,10 +244,7 @@ def test_env_expansion():
 
     assert expansion.log_critic == log_critic, "log_critic mismatch"
 
-    for i, tac in enumerate(expansion.tactics):
-        assert tac.unique_string == expansion_tactics[i].unique_string, f"tactic[{i}] unique_string mismatch"
-        assert tac.is_valid == expansion_tactics[i].is_valid, f"tactic[{i}] is_valid mismatch"
-        assert tac.duration == expansion_tactics[i].duration, f"tactic[{i}] duration mismatch"
+    _compare_tactics(expansion.tactics, expansion_tactics)
 
     assert len(expansion.children_for_tactic) == len(children_for_tactic), "children_for_tactic length mismatch"
     _compare_theorem(expansion.children_for_tactic[0][0], goal)
@@ -268,6 +302,7 @@ def test_htps_sample_tactics():
     assert sample_tactics.inproof == inproof, "inproof mismatch"
     assert sample_tactics.q_estimates == q_estimates, "q_estimates mismatch"
     assert sample_tactics.visit_count == visit_count, "visit_count mismatch"
+    _compare_tactics(sample_tactics.tactics, tactics)
 
     visit_count = -100
     with pytest.raises(ValueError):
@@ -281,17 +316,45 @@ def test_proof():
     tac = Tactic("tac_main", True, 10)
     proof_obj = Proof(theorem=thm, tactic=tac, children=[])
 
-    _compare_theorem(proof_obj.proof_theorem, thm)
-    assert proof_obj.proof_tactic.unique_string == tac.unique_string
+    _compare_theorem(proof_obj.theorem, thm)
+    assert proof_obj.tactic.unique_string == tac.unique_string
     assert proof_obj.children == []
 
     child_proof = Proof(theorem=thm, tactic=tac, children=[])
     proof_obj2 = Proof(theorem=thm, tactic=tac, children=[child_proof])
     assert len(proof_obj2.children) == 1
-    _compare_theorem(proof_obj2.children[0].proof_theorem, thm)
-    _compare_tactics([proof_obj2.children[0].proof_tactic], [tac])
+    _compare_theorem(proof_obj2.children[0].theorem, thm)
+    _compare_tactics([proof_obj2.children[0].tactic], [tac])
     assert proof_obj2.children[0].children == []
 
+def test_result():
+    context = Context(["∧", "", " "])
+    hypotheses = [Hypothesis("H1", "A"),Hypothesis("H2", "B")]
+
+    tactics = [Tactic("tac1", True, 5)]
+    goal = Theorem("goal_conclusion", "goal_unique", hypotheses, context, tactics)
+    sample_critic = SampleCritic(goal, 0.8, True, False, 0.3, 42)
+    sample_tactics = SampleTactics(goal, tactics, [0.6], InProof.InProof, [0.7], 100)
+    sample_effect = SampleEffect(goal, tactics[0], [])
+    proof_samples_tactics = [sample_tactics]
+    metric = Metric.Depth
+    proof_obj = Proof(theorem=goal, tactic=tactics[0], children=[])
+    result = Result(
+        critic_samples=[sample_critic],
+        tactic_samples=[sample_tactics],
+        effect_samples=[sample_effect],
+        metric=metric,
+        proof_samples_tactics=proof_samples_tactics,
+        goal=goal,
+        proof=proof_obj
+    )
+    _compare_critic_samples(result.critic_samples, [sample_critic])
+    _compare_tactic_samples(result.tactic_samples, [sample_tactics])
+    _compare_effect_samples(result.effect_samples, [sample_effect])
+    assert result.metric == metric, "metric mismatch"
+    _compare_tactic_samples(result.proof_samples_tactics, proof_samples_tactics)
+    _compare_theorem(result.goal, goal)
+    _compare_theorem(result.proof.theorem, proof_obj.theorem)
 
 def test_htps_basic():
     context = Context([])
@@ -327,12 +390,12 @@ def test_htps_expansion():
     # Will find the root
     theorems = search.theorems_to_expand()
     env_durations = [1, 1]
-    log_critic = 1.234
-    tactic_a = Tactic("dummy_tactic", True, 1)
-    tactic_b = Tactic("dummy_tactic", True, 1)
+    log_critic = -0.5
+    tactic_a = Tactic("dummy_tactica", True, 1)
+    tactic_b = Tactic("dummy_tacticb", True, 1)
     expansion_tactics = [tactic_a, tactic_b]
     children_for_tactic = [[theorem2], [theorem2]]
-    priors = [0.5, 0.7]
+    priors = [0.5, 0.5]
     effect1 = EnvEffect(theorem, tactic_b, [theorem2])
     effect2 = EnvEffect(theorem, tactic_a, [theorem2])
     effects = [effect1, effect2]
@@ -343,15 +406,29 @@ def test_htps_expansion():
     assert len(theorems) == 1
     _compare_theorem(theorems[0], theorem2)
 
-    env_durations = [10, 20]
-    log_critic = 1.234
-    tactic_a = Tactic("tac_a", True, 5)
-    tactic_b = Tactic("tac_b", True, 10)
-    expansion_tactics = [tactic_a]
+    env_durations = [10]
+    log_critic = -0.1
+    tactic_a2 = Tactic("tac_a", True, 5)
+    expansion_tactics = [tactic_a2]
     children_for_tactic = [[]]
-    priors = [0.5, 0.7]
-    effect2 = EnvEffect(theorem, tactic_a, [])
+    priors = [1.0]
+    effect2 = EnvEffect(theorem2, tactic_a2, [])
     effects = [effect2]
-    expansion = EnvExpansion(theorems[0], 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
+    expansion = EnvExpansion(theorem2, 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
     search.expand_and_backup([expansion])
     assert search.proven()
+
+    # Get result
+    result = search.get_result()
+    # Check result
+    assert len(result.critic_samples) == 2
+    assert len(result.tactic_samples) == 2
+    assert len(result.effect_samples) == 3 # 3 effects in total
+    assert len(result.proof_samples_tactics) == 2
+    tactic_samples = [SampleTactics(theorem2, tactics=[tactic_a2], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=0), SampleTactics(theorem, tactics=[tactic_a, tactic_b], target_pi=[-1.0, -1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0, 1.0], visit_count=1)]
+    _compare_critic_samples(result.critic_samples, [SampleCritic(theorem2, q_estimate=1.0, solved=True, bad=False, critic=0.0, visit_count=0), SampleCritic(theorem, q_estimate=1.0, solved=True, bad=False, critic=-0.5, visit_count=1)])
+    _compare_tactic_samples(result.tactic_samples, tactic_samples)
+    _compare_effect_samples(result.effect_samples, [SampleEffect(theorem2, tactic_a2, []), SampleEffect(theorem, tactic_b, [theorem2]), SampleEffect(theorem, tactic_a, [theorem2])])
+    _compare_tactic_samples(result.proof_samples_tactics, tactic_samples)
+    assert result.metric == Metric.Time
+    _compare_theorem(result.goal, theorem)

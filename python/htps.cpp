@@ -85,7 +85,7 @@ static PyObject *make_in_proof(PyObject *module, PyObject *enum_module) {
     if (InProofEnum != NULL)
         return InProofEnum;
     size_t value_size = 3;
-    const char *values[value_size] = {"InMinimalProof", "InProof", "NotInProof"};
+    const char *values[value_size] = {"NotInProof", "InProof", "InMinimalProof"};
     InProofEnum = make_enum(module, enum_module, values, value_size, "InProof");
     return InProofEnum;
 }
@@ -1704,6 +1704,18 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 Py_DECREF(item);
             }
             Py_DECREF(iter);
+            // Check prior list
+            if (priors.size() != tactics.size()) {
+                PyErr_SetString(PyExc_ValueError, "priors must have the same length as tactics");
+                return -1;
+            }
+            double sum = std::accumulate(priors.begin(), priors.end(), 0.0);
+            if (sum < 0.99 || sum > 1.01) {
+                PyErr_SetString(PyExc_ValueError, "priors must sum to 1");
+                return -1;
+            }
+
+
             new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(
                 shared_thm, expander_duration, generation_duration, env_durations,
                 effects, log_critic, tactics, children_for_tactic, priors
@@ -2010,11 +2022,15 @@ static PyObject* PyHTPSSampleCritic_get_q_estimate(PyHTPSSampleCritic *self, voi
 }
 
 static PyObject* PyHTPSSampleCritic_get_solved(PyHTPSSampleCritic *self, void *closure) {
-    return self->cpp_obj.is_solved() ? Py_True : Py_False;
+    PyObject *res = self->cpp_obj.is_solved() ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
 }
 
 static PyObject* PyHTPSSampleCritic_get_bad(PyHTPSSampleCritic *self, void *closure) {
-    return self->cpp_obj.is_bad() ? Py_True : Py_False;
+    PyObject *res = self->cpp_obj.is_bad() ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
 }
 
 static PyObject* PyHTPSSampleCritic_get_critic(PyHTPSSampleCritic *self, void *closure) {
@@ -2406,8 +2422,8 @@ static PyObject* PyProof_get_children(PyProof *self, void *closure) {
 }
 
 static PyGetSetDef PyProof_getsetters[] = {
-        {"proof_theorem", (getter)PyProof_get_proof_theorem, NULL, "Theorem used in the proof", NULL},
-        {"proof_tactic", (getter)PyProof_get_proof_tactic, NULL, "Tactic used in the proof", NULL},
+        {"theorem", (getter)PyProof_get_proof_theorem, NULL, "Theorem used in the proof", NULL},
+        {"tactic", (getter)PyProof_get_proof_tactic, NULL, "Tactic used in the proof", NULL},
         {"children", (getter)PyProof_get_children, NULL, "Child proof objects", NULL},
         {NULL}
 };
@@ -2459,6 +2475,435 @@ PyTypeObject PyProofType = {
 
 typedef struct {
     PyObject_HEAD
+    htps::HTPSResult cpp_obj;
+} PyHTPSResult;
+
+template<typename T, typename U>
+std::vector<T> PyObject_to_vector(PyObject *obj, PyTypeObject *type, const char *error_msg) {
+    auto iter = PyObject_GetIter(obj);
+    if (!iter) {
+        PyErr_SetString(PyExc_TypeError, "object must be iterable");
+        throw std::runtime_error("Type error");
+    }
+    std::vector<T> vec;
+    PyObject *item;
+    while ((item = PyIter_Next(iter)) != NULL) {
+        if (!PyObject_TypeCheck(item, type)) {
+            PyErr_SetString(PyExc_TypeError, error_msg);
+            Py_DECREF(item);
+            Py_DECREF(iter);
+            throw std::runtime_error("Type error");
+        }
+        auto *wrapper = (U*) item;
+        vec.push_back(wrapper->cpp_obj);
+        Py_DECREF(item);
+    }
+    Py_DECREF(iter);
+    return vec;
+}
+
+
+
+static void PyHTPSResult_dealloc(PyHTPSResult *self) {
+    self->cpp_obj.~HTPSResult();
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+
+static PyObject *PyHTPSResult_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+    auto *self = (PyHTPSResult *) type->tp_alloc(type, 0);
+    if (self == NULL) {
+        return PyErr_NoMemory();
+    }
+    new (&(self->cpp_obj)) htps::HTPSResult();
+    return (PyObject *) self;
+}
+
+static int PyHTPSResult_init(PyObject *self, PyObject *args, PyObject *kwargs) {
+    auto *result = (PyHTPSResult *) self;
+    PyObject *py_critic_samples, *py_tactic_samples, *py_effect_samples, *py_metric, *py_proof_samples_tactics, *py_goal, *py_proof;
+    static const char *kwlist[] = { "critic_samples", "tactic_samples", "effect_samples", "metric", "proof_samples_tactics", "goal", "proof", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOOOOOO", const_cast<char**>(kwlist),
+                                     &py_critic_samples, &py_tactic_samples, &py_effect_samples, &py_metric, &py_proof_samples_tactics, &py_goal, &py_proof)) {
+        return -1;
+    }
+    std::vector<htps::HTPSSampleCritic> critic_samples;
+    std::vector<htps::HTPSSampleTactics> tactic_samples;
+    std::vector<htps::HTPSSampleEffect> effect_samples;
+    std::vector<htps::HTPSSampleTactics> proof_samples_tactics;
+
+    try {
+        critic_samples = PyObject_to_vector<htps::HTPSSampleCritic, PyHTPSSampleCritic>(py_critic_samples, &PyHTPSSampleCriticType, "each item in critic_samples must be a SampleCritic object");
+        tactic_samples = PyObject_to_vector<htps::HTPSSampleTactics, PyHTPSSampleTactics>(py_tactic_samples, &PyHTPSSampleTacticsType, "each item in tactic_samples must be a SampleTactics object");
+        effect_samples = PyObject_to_vector<htps::HTPSSampleEffect, PyHTPSSampleEffect>(py_effect_samples, &PyHTPSSampleEffectType, "each item in effect_samples must be a SampleEffect object");
+        proof_samples_tactics = PyObject_to_vector<htps::HTPSSampleTactics, PyHTPSSampleTactics>(py_proof_samples_tactics, &PyHTPSSampleTacticsType, "each item in proof_samples_tactics must be a SampleTactics object");
+    } catch (std::runtime_error &e) {
+        return -1;
+    }
+    int metric_value = get_enum_value(py_metric, "Metric");
+    if (metric_value < 0) {
+        return -1;
+    }
+    auto metric = (htps::Metric) metric_value;
+
+    if (!PyObject_TypeCheck(py_goal, &TheoremType)) {
+        PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
+        return -1;
+    }
+    if (!PyObject_TypeCheck(py_proof, &PyProofType)) {
+        PyErr_SetString(PyExc_TypeError, "proof must be a Proof object");
+        return -1;
+    }
+    auto *goal = (htps::lean_theorem *) py_goal;
+    auto thm = static_cast<std::shared_ptr<htps::theorem>>(std::make_shared<htps::lean_theorem>(*goal));
+    auto *proof = (PyProof *) py_proof;
+    result->cpp_obj.~HTPSResult();
+    new (&result->cpp_obj) htps::HTPSResult(critic_samples, tactic_samples, effect_samples, metric, proof_samples_tactics, thm, proof->cpp_obj);
+    return 0;
+}
+
+
+static PyObject *PyHTPSResult_get_critic_samples(PyHTPSResult *self, void *closure) {
+    auto vec = self->cpp_obj.get_critic_samples();
+    PyObject *list = PyList_New(vec.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < vec.size(); i++) {
+        auto thm = Theorem_NewFromShared(vec[i].get_goal());
+        if (!thm) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *solved = vec[i].is_solved() ? Py_True : Py_False;
+        PyObject *bad = vec[i].is_bad() ? Py_True : Py_False;
+        PyObject *args = Py_BuildValue("OdOOdk", thm, vec[i].get_q_estimate(), solved, bad, vec[i].get_critic(), vec[i].get_visit_count());
+        Py_DECREF(thm);
+        if (!args) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *item = PyObject_CallObject((PyObject *) &PyHTPSSampleCriticType, args);
+        Py_DECREF(args);
+        if (!item) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, item);
+    }
+    return list;
+}
+
+static PyObject *PyHTPSResult_get_tactic_samples(PyHTPSResult *self, void *closure) {
+    auto vec = self->cpp_obj.get_tactic_samples();
+    PyObject *list = PyList_New(vec.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < vec.size(); i++) {
+        auto thm = Theorem_NewFromShared(vec[i].get_goal());
+        if (!thm) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *tactics = PyList_New(vec[i].get_tactics().size());
+        if (!tactics) {
+            Py_DECREF(thm);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_tactics().size(); j++) {
+            auto tac = Tactic_NewFromShared(vec[i].get_tactics()[j]);
+            if (!tac) {
+                Py_DECREF(thm);
+                Py_DECREF(tactics);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(tactics, j, tac);
+        }
+        PyObject *target_pi = PyList_New(vec[i].get_target_pi().size());
+        if (!target_pi) {
+            Py_DECREF(thm);
+            Py_DECREF(tactics);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_target_pi().size(); j++) {
+            PyObject *num = PyFloat_FromDouble(vec[i].get_target_pi()[j]);
+            if (!num) {
+                Py_DECREF(thm);
+                Py_DECREF(target_pi);
+                Py_DECREF(tactics);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(target_pi, j, num);
+        }
+        PyObject *q_estimates = PyList_New(vec[i].get_q_estimates().size());
+        if (!q_estimates) {
+            Py_DECREF(thm);
+            Py_DECREF(tactics);
+            Py_DECREF(target_pi);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_q_estimates().size(); j++) {
+            PyObject *num = PyFloat_FromDouble(vec[i].get_q_estimates()[j]);
+            if (!num) {
+                Py_DECREF(thm);
+                Py_DECREF(tactics);
+                Py_DECREF(target_pi);
+                Py_DECREF(q_estimates);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(q_estimates, j, num);
+        }
+
+        PyObject *inproof = PyObject_CallFunction(InProofEnum, "i", vec[i].get_inproof());
+
+        PyObject *args = Py_BuildValue("OOOOOn", thm, tactics, target_pi, inproof, q_estimates, vec[i].get_visit_count());
+        Py_DECREF(thm);
+        Py_DECREF(tactics);
+        Py_DECREF(target_pi);
+        Py_DECREF(inproof);
+        Py_DECREF(q_estimates);
+        if (!args) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *item = PyObject_CallObject((PyObject *) &PyHTPSSampleTacticsType, args);
+        Py_DECREF(args);
+        if (!item) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, item);
+    }
+    return list;
+}
+
+static PyObject *PyHTPSResult_get_effect_samples(PyHTPSResult *self, void *closure) {
+    auto vec = self->cpp_obj.get_effect_samples();
+    PyObject *list = PyList_New(vec.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < vec.size(); i++) {
+        auto thm = Theorem_NewFromShared(vec[i].get_goal());
+        if (!thm) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *tac = Tactic_NewFromShared(vec[i].get_tactic());
+        if (!tac) {
+            Py_DECREF(thm);
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *children = PyList_New(vec[i].get_children().size());
+        if (!children) {
+            Py_DECREF(thm);
+            Py_DECREF(tac);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_children().size(); j++) {
+            auto child = Theorem_NewFromShared(vec[i].get_children()[j]);
+            if (!child) {
+                Py_DECREF(thm);
+                Py_DECREF(tac);
+                Py_DECREF(children);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(children, j, child);
+        }
+
+        PyObject *args = Py_BuildValue("OOO", thm, tac, children);
+        Py_DECREF(thm);
+        Py_DECREF(tac);
+        Py_DECREF(children);
+        if (!args) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *item = PyObject_CallObject((PyObject *) &PyHTPSSampleEffectType, args);
+        Py_DECREF(args);
+        if (!item) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, item);
+    }
+    return list;
+}
+
+static PyObject *PyHTPSResult_get_proof_samples_tactics(PyHTPSResult *self, void *closure) {
+    auto vec = self->cpp_obj.get_proof_samples();
+    PyObject *list = PyList_New(vec.size());
+    if (!list)
+        return PyErr_NoMemory();
+    for (size_t i = 0; i < vec.size(); i++) {
+        auto thm = Theorem_NewFromShared(vec[i].get_goal());
+        if (!thm) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *tactics = PyList_New(vec[i].get_tactics().size());
+        if (!tactics) {
+            Py_DECREF(thm);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_tactics().size(); j++) {
+            auto tac = Tactic_NewFromShared(vec[i].get_tactics()[j]);
+            if (!tac) {
+                Py_DECREF(thm);
+                Py_DECREF(tactics);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(tactics, j, tac);
+        }
+        PyObject *target_pi = PyList_New(vec[i].get_target_pi().size());
+        if (!target_pi) {
+            Py_DECREF(thm);
+            Py_DECREF(tactics);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_target_pi().size(); j++) {
+            PyObject *num = PyFloat_FromDouble(vec[i].get_target_pi()[j]);
+            if (!num) {
+                Py_DECREF(thm);
+                Py_DECREF(target_pi);
+                Py_DECREF(tactics);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(target_pi, j, num);
+        }
+        PyObject *q_estimates = PyList_New(vec[i].get_q_estimates().size());
+        if (!q_estimates) {
+            Py_DECREF(thm);
+            Py_DECREF(tactics);
+            Py_DECREF(target_pi);
+            Py_DECREF(list);
+            return PyErr_NoMemory();
+        }
+        for (size_t j = 0; j < vec[i].get_q_estimates().size(); j++) {
+            PyObject *num = PyFloat_FromDouble(vec[i].get_q_estimates()[j]);
+            if (!num) {
+                Py_DECREF(thm);
+                Py_DECREF(tactics);
+                Py_DECREF(target_pi);
+                Py_DECREF(q_estimates);
+                Py_DECREF(list);
+                return NULL;
+            }
+            PyList_SET_ITEM(q_estimates, j, num);
+        }
+        PyObject *inproof = PyObject_CallFunction(InProofEnum, "i", vec[i].get_inproof());
+
+        PyObject *args = Py_BuildValue("OOOOOn", thm, tactics, target_pi, inproof, q_estimates, vec[i].get_visit_count());
+        Py_DECREF(thm);
+        Py_DECREF(tactics);
+        Py_DECREF(target_pi);
+        Py_DECREF(inproof);
+        Py_DECREF(q_estimates);
+        if (!args) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyObject *item = PyObject_CallObject((PyObject *) &PyHTPSSampleTacticsType, args);
+        Py_DECREF(args);
+        if (!item) {
+            Py_DECREF(list);
+            return NULL;
+        }
+        PyList_SET_ITEM(list, i, item);
+    }
+    return list;
+}
+
+static PyObject *PyHTPSResult_get_metric(PyHTPSResult *self, void *closure) {
+    return PyObject_CallFunction(MetricEnum, "i", self->cpp_obj.get_metric());
+}
+
+static PyObject *PyHTPSResult_get_goal(PyHTPSResult *self, void *closure) {
+    return Theorem_NewFromShared(self->cpp_obj.get_goal());
+}
+
+static PyObject *PyHTPSResult_get_proof(PyHTPSResult *self, void *closure) {
+    return PyProof_NewFromProof(self->cpp_obj.get_proof());
+}
+
+static PyGetSetDef PyHTPSResult_getsetters[] = {
+        {"critic_samples", (getter)PyHTPSResult_get_critic_samples, NULL, "Critic samples", NULL},
+        {"tactic_samples", (getter)PyHTPSResult_get_tactic_samples, NULL, "Tactic samples", NULL},
+        {"effect_samples", (getter)PyHTPSResult_get_effect_samples, NULL, "Effect samples", NULL},
+        {"metric", (getter)PyHTPSResult_get_metric, NULL, "Metric", NULL},
+        {"proof_samples_tactics", (getter)PyHTPSResult_get_proof_samples_tactics, NULL, "Proof samples", NULL},
+        {"goal", (getter)PyHTPSResult_get_goal, NULL, "Goal theorem", NULL},
+        {"proof", (getter)PyHTPSResult_get_proof, NULL, "Proof", NULL},
+        {NULL}
+};
+
+static PyMethodDef PyHTPSResult_methods[] = {
+        {NULL, NULL, 0, NULL}
+};
+
+PyTypeObject PyHTPSResultType = {
+        PyObject_HEAD_INIT(NULL)
+        "htps.Result",
+        sizeof(PyHTPSResult),
+        0,
+        (destructor) PyHTPSResult_dealloc,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        Py_TPFLAGS_DEFAULT,
+        "Result for a full HTPS run",
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        PyHTPSResult_methods,
+        NULL,
+        PyHTPSResult_getsetters,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        (initproc)PyHTPSResult_init,
+        NULL,
+        (newfunc)PyHTPSResult_new,
+};
+
+static PyObject* PyHTPSResult_NewFromResult(const htps::HTPSResult &result) {
+    PyObject *obj = PyHTPSResult_new(&PyHTPSResultType, NULL, NULL);
+    if (obj == NULL)
+        return NULL;
+    auto *py_result = (PyHTPSResult *) obj;
+    py_result->cpp_obj = result;
+    return obj;
+}
+
+typedef struct {
+    PyObject_HEAD
     htps::HTPS graph;
 } PyHTPS;
 
@@ -2496,7 +2941,14 @@ static int HTPS_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 static PyObject* PyHTPS_theorems_to_expand(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
-    std::vector<std::shared_ptr<htps::theorem>> thms = self->graph.theorems_to_expand();
+    std::vector<std::shared_ptr<htps::theorem>> thms;
+    try {
+         thms = self->graph.theorems_to_expand();
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+
     PyObject *list = PyList_New(thms.size());
     if (!list)
         return PyErr_NoMemory();
@@ -2544,12 +2996,35 @@ static PyObject* PyHTPS_expand_and_backup(PyHTPS *self, PyObject *args) {
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    self->graph.expand_and_backup(expansions);
+    try {
+        self->graph.expand_and_backup(expansions);
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
     Py_RETURN_NONE;
 }
 
 static PyObject* PyHTPS_is_proven(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
-    return self->graph.is_proven() ? Py_True : Py_False;
+    PyObject * res = self->graph.is_proven() ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
+}
+
+static void PyHTPS_dealloc(PyHTPS *self) {
+    self->graph.~HTPS();
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyObject* PyHTPS_get_result(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    htps::HTPSResult result;
+    try {
+        result = self->graph.get_result();
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+    return PyHTPSResult_NewFromResult(result);
 }
 
 
@@ -2557,6 +3032,7 @@ static PyMethodDef HTPS_methods[] = {
     {"theorems_to_expand", (PyCFunction)PyHTPS_theorems_to_expand, METH_NOARGS, "Returns a list of subsequent theorems to expand"},
     {"expand_and_backup", (PyCFunction)PyHTPS_expand_and_backup, METH_VARARGS,  "Expands and backups using the provided list of EnvExpansion objects"},
     {"proven", (PyCFunction)PyHTPS_is_proven, METH_NOARGS, "Whether the start theorem is proven or not"},
+        {"get_result", (PyCFunction)PyHTPS_get_result, METH_NOARGS, "Returns the result of the HTPS run"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2564,7 +3040,7 @@ static PyTypeObject HTPSType = {
     PyObject_HEAD_INIT(NULL) "htps.HTPS",
     sizeof(PyHTPS),
     0,
-    NULL,
+    (destructor)PyHTPS_dealloc,
     NULL,
     NULL,
     NULL,
@@ -3086,6 +3562,52 @@ PyInit_htps(void) {
         return NULL;
     }
 
+    if (PyType_Ready(&PyHTPSResultType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(in_proof);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        Py_DECREF(&EnvExpansionType);
+        Py_DECREF(&PyHTPSSampleEffectType);
+        Py_DECREF(&PyHTPSSampleCriticType);
+        Py_DECREF(&PyHTPSSampleTacticsType);
+        Py_DECREF(&PyProofType);
+        return NULL;
+    }
+
+    Py_INCREF(&PyHTPSResultType);
+    if (PyModule_AddObject(m, "Result", (PyObject *) &PyHTPSResultType) < 0) {
+        Py_DECREF(m);
+        Py_DECREF(enum_mod);
+        Py_DECREF(policy_type);
+        Py_DECREF(q_value_solved);
+        Py_DECREF(node_mask);
+        Py_DECREF(metric);
+        Py_DECREF(in_proof);
+        Py_DECREF(&ParamsType);
+        Py_DECREF(&HypothesisType);
+        Py_DECREF(&TacticType);
+        Py_DECREF(&ContextType);
+        Py_DECREF(&TheoremType);
+        Py_DECREF(&EnvEffectType);
+        Py_DECREF(&EnvExpansionType);
+        Py_DECREF(&PyHTPSSampleEffectType);
+        Py_DECREF(&PyHTPSSampleCriticType);
+        Py_DECREF(&PyHTPSSampleTacticsType);
+        Py_DECREF(&PyProofType);
+        Py_XDECREF(&PyHTPSResultType);
+        return NULL;
+    }
+
     if (PyType_Ready(&HTPSType) < 0) {
         Py_DECREF(m);
         Py_DECREF(enum_mod);
@@ -3104,6 +3626,8 @@ PyInit_htps(void) {
         Py_DECREF(&PyHTPSSampleEffectType);
         Py_DECREF(&PyHTPSSampleCriticType);
         Py_DECREF(&PyHTPSSampleTacticsType);
+        Py_DECREF(&PyProofType);
+        Py_DECREF(&PyHTPSResultType);
         return NULL;
     }
 
@@ -3126,6 +3650,8 @@ PyInit_htps(void) {
         Py_DECREF(&PyHTPSSampleEffectType);
         Py_DECREF(&PyHTPSSampleCriticType);
         Py_DECREF(&PyHTPSSampleTacticsType);
+        Py_DECREF(&PyProofType);
+        Py_DECREF(&PyHTPSResultType);
         Py_XDECREF(&HTPSType);
         return NULL;
     }

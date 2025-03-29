@@ -1,2 +1,2 @@
-graft src/**/*.h
-graft python/**/*.h
+graft src
+graft python

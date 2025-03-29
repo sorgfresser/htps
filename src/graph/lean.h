@@ -59,12 +59,12 @@ namespace htps {
 
         lean_theorem() = default;
 
-        ~lean_theorem() {
-            past_tactics.clear();
-#ifdef PYTHON_BINDINGS
-            Py_XDECREF(py_dict);
-#endif
-        }
+//        ~lean_theorem() {
+//            past_tactics.clear();
+//#ifdef PYTHON_BINDINGS
+//            Py_XDECREF(py_dict);
+//#endif
+//        }
 
         bool operator==(const theorem &t) const override;
     };

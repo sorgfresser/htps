@@ -3,3 +3,4 @@ setuptools
 wheel
 sphinx
 pytest
+sphinx-rtd-theme

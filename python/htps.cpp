@@ -3011,6 +3011,12 @@ static PyObject* PyHTPS_is_proven(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
     return res;
 }
 
+static PyObject* PyHTPS_is_done(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    PyObject * res = self->graph.is_done() ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
+}
+
 static void PyHTPS_dealloc(PyHTPS *self) {
     self->graph.~HTPS();
     Py_TYPE(self)->tp_free((PyObject*)self);
@@ -3032,7 +3038,8 @@ static PyMethodDef HTPS_methods[] = {
     {"theorems_to_expand", (PyCFunction)PyHTPS_theorems_to_expand, METH_NOARGS, "Returns a list of subsequent theorems to expand"},
     {"expand_and_backup", (PyCFunction)PyHTPS_expand_and_backup, METH_VARARGS,  "Expands and backups using the provided list of EnvExpansion objects"},
     {"proven", (PyCFunction)PyHTPS_is_proven, METH_NOARGS, "Whether the start theorem is proven or not"},
-        {"get_result", (PyCFunction)PyHTPS_get_result, METH_NOARGS, "Returns the result of the HTPS run"},
+    {"get_result", (PyCFunction)PyHTPS_get_result, METH_NOARGS, "Returns the result of the HTPS run"},
+    {"is_done", (PyCFunction)PyHTPS_is_done, METH_NOARGS, "Whether the HTPS run is done or not"},
     {NULL, NULL, 0, NULL}
 };
 

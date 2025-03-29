@@ -587,6 +587,10 @@ bool HTPS::dead_root() const {
     return (propagate_needed && unexplored_theorems.empty()) || (nodes.contains(root) && nodes.at(root)->is_bad());
 }
 
+bool HTPS::is_done() const {
+    return done;
+}
+
 void
 HTPS::get_train_samples(std::vector<HTPSSampleEffect> &samples_effects, std::vector<HTPSSampleCritic> &samples_critic,
                         std::vector<HTPSSampleTactics> &samples_tactics) const {

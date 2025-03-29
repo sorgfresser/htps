@@ -8,7 +8,7 @@ module = Extension(
         "src/graph/base.cpp", "src/graph/graph.cpp", "src/env/core.cpp",
         "src/model/policy.cpp"
     ],
-    include_dirs=["src", "python", "external/glob/single_include"],
+    include_dirs=["src", "external/glob/single_include"],
     extra_compile_args=["-std=c++20", "-O3", "-pedantic", "-DPYTHON_BINDINGS"],
     extra_link_args=[],
     define_macros=[],

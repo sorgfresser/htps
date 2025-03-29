@@ -5,10 +5,10 @@
 Unlike the sadly non-functional available part of the original implementation, Open HTPS provides a complete and reliable version implemented efficiently in C++, combined with Python bindings for easy integration into your research workflows.
 
 ## Why Open HTPS?
-- **Efficiency:** Fast C++ implementation ensures high-performance proof searches.
-- **Usability:** Python bindings simplify integration, allowing researchers to easily incorporate it into existing pipelines.
-- **Research-Focused:** Abstracts away complex tree-search mechanics, enabling researchers to concentrate on tactic generation, critics, environments, and conjecture generation.
-- **Open Source:** Available for customization and extension by the research community.
+- **Efficiency:** Fast C++ implementation
+- **Usability:** Python bindings for easy integration into existing work
+- **Research-Focused:** Abstracts away complex tree-search so that researchers can concentrate on tactic generation, critics, environments and conjecture generation.
+- **Open Source:** Available for customization and extension. Free to use for academic and commercial purposes.
 
 ## Key Features
 - ✅ **Fast and Efficient Proof Search**

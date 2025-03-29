@@ -59,6 +59,8 @@ namespace htps {
 
         lean_theorem() = default;
 
+        ~lean_theorem() = default;
+
         bool operator==(const theorem &t) const override;
     };
 }

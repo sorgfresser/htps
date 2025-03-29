@@ -3,4 +3,3 @@ setuptools
 wheel
 sphinx
 pytest
-twine

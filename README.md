@@ -1,26 +1,27 @@
 # Open HTPS
 
-**Open HTPS** is an open-source implementation of **HyperTreeProofSearch (HTPS)**, an efficient proof search algorithm introduced by Lample et al. (2020). This repository addresses a crucial gap in the Automated Theorem Proving community: the need for a fast, fully open-source, and easy-to-use proof search tool.
+**Open HTPS** is an open-source implementation of **HyperTreeProofSearch (HTPS)**, an efficient proof search algorithm introduced by Lample et al. (2022). This repository addresses a gap in the Automated Theorem Proving community: the need for a fast, open-source, and easy-to-use proof search tool.
 
-Unlike the non-functional original implementation, Open HTPS provides a complete and reliable version implemented efficiently in C++, combined with intuitive Python bindings for easy integration into your research workflows.
+Unlike the sadly non-functional available part of the original implementation, Open HTPS provides a complete and reliable version implemented efficiently in C++, combined with Python bindings for easy integration into your research workflows.
 
 ## Why Open HTPS?
 - **Efficiency:** Fast C++ implementation ensures high-performance proof searches.
 - **Usability:** Python bindings simplify integration, allowing researchers to easily incorporate it into existing pipelines.
 - **Research-Focused:** Abstracts away complex tree-search mechanics, enabling researchers to concentrate on tactic generation, critics, environments, and conjecture generation.
-- **Open Source:** Fully available for customization and extension by the research community.
+- **Open Source:** Available for customization and extension by the research community.
 
 ## Key Features
 - ✅ **Fast and Efficient Proof Search**
 - ✅ **Proof Assistant Agnostic**: Works seamlessly with various proof assistants.
 - ✅ **User-Friendly Python Interface**
-- ✅ **Training Data Generation**: Provides training samples for tactic generators, critics, and dynamics models.
+- ✅ **Training Data Generation**: Training samples for tactic generators, critics, and dynamics models.
 
 ## Quick Start
 
 ### Installation
 
-Open HTPS is available on PyPI. Before installation, ensure you have a C++ compiler and Python development headers (`Python-dev`) installed:
+Open HTPS is available on PyPI. Before installation, ensure you have a C++ compiler and Python development headers (`Python-dev`) installed.
+Afterward, run the following:
 
 ```bash
 pip3 install htps
@@ -52,7 +53,7 @@ tactic_samples = result.tactic_samples
 critic_samples = result.critic_samples
 effect_samples = result.effect_samples
 ```
-The full information can be found in the [documentation](https://open-htps.readthedocs.io/en/latest/).
+The full information can be found in the [documentation](https://htps.readthedocs.io/en/latest/).
 
 
 ## Contributing

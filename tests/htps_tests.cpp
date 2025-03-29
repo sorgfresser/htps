@@ -17,12 +17,8 @@ public:
                  const std::vector<hypothesis> &hyps = {})
             : theorem(conclusion, hyps) {}
 
-    std::vector<std::string> tokenize() const override {
-        return {"dummy_token"};
-    }
-
-    void tokenize(std::vector<std::string> &tokens) const override {
-        tokens.emplace_back("dummy_token");
+    bool operator==(const theorem &t) const override {
+        return unique_string == t.unique_string;
     }
 };
 
@@ -34,12 +30,8 @@ public:
         duration = dur;
     }
 
-    std::vector<std::string> tokenize() const override {
-        return {"tactic_token"};
-    }
-
-    void tokenize(std::vector<std::string> &tokens) const override {
-        tokens.emplace_back("tactic_token");
+    bool operator==(const tactic &t) const override {
+        return unique_string == t.unique_string;
     }
 };
 
@@ -334,6 +326,46 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     to_expand = htps_instance->theorems_to_expand();
     EXPECT_TRUE(htps_instance->is_proven());
     EXPECT_TRUE(to_expand.empty());
+
+    // Get results
+    HTPSResult result = htps_instance->get_result();
+    EXPECT_TRUE(result.get_goal() == root);
+
+    // Check proof
+    struct proof p = result.get_proof();
+    EXPECT_TRUE(p.proof_theorem == root);
+    EXPECT_TRUE(p.proof_tactic ==dummyTac);
+    auto p_children = p.children;
+    EXPECT_TRUE(p_children.size() == 3);
+    const auto& p_child = p_children[0];
+    EXPECT_TRUE(p_child.proof_theorem == children[0]);
+    EXPECT_TRUE(p_child.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child.children.empty());
+    const auto &p_child2 = p_children[1];
+    EXPECT_TRUE(p_child2.proof_theorem == children[1]);
+    EXPECT_TRUE(p_child2.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child2.children.size() == 1);
+    const auto &p_child3 = p_children[2];
+    EXPECT_TRUE(p_child3.proof_theorem == children[2]);
+    EXPECT_TRUE(p_child3.proof_tactic == dummyTac);
+    EXPECT_TRUE(p_child3.children.size() == 1);
+    const auto &p_child4 = p_child2.children[0];
+    EXPECT_TRUE(p_child4.proof_theorem == child3);
+    EXPECT_TRUE(p_child4.proof_tactic == dummyTac2);
+    EXPECT_TRUE(p_child4.children.empty());
+    const auto &p_child5 = p_child3.children[0];
+    EXPECT_TRUE(p_child5.proof_theorem == child4);
+    EXPECT_TRUE(p_child5.proof_tactic == dummyTac2);
+    EXPECT_TRUE(p_child5.children.empty());
+
+    // Check samples
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    EXPECT_TRUE(metric == dummyParams.metric);
+    EXPECT_FALSE(samples_critic.empty());
+    EXPECT_TRUE(samples_critic.size() == 6);
+    EXPECT_TRUE(samples_tactic.size() == 6);
+    EXPECT_TRUE(samples_effect.size() == 6);
+    EXPECT_TRUE(proof_samples_tactics.size() == 6);
 }
 
 TEST_F(HTPSTest, TestBackupOnce) {
@@ -343,13 +375,11 @@ TEST_F(HTPSTest, TestBackupOnce) {
     htps_instance->set_params(dummyParams);
 
     EXPECT_FALSE(htps_instance->is_proven());
-    //std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
 
     htps_instance->theorems_to_expand();
     // Create children for the root theorem.
     std::vector<std::shared_ptr<htps::theorem>> children;
     for (int i = 0; i < 2; i++) {
-        //auto child = std::make_shared<DummyTheorem>(conv.from_bytes("B"));
         auto child = std::make_shared<DummyTheorem>("B");
         children.push_back(child);
     }
@@ -376,4 +406,87 @@ TEST_F(HTPSTest, TestBackupOnce) {
     std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
 
     htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == children[0]);
+
+    effects.clear();
+    effect->goal = children[0];
+    effect->tac = dummyTac2;
+    effect->children = {};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {children[0], 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+    htps_instance->expand_and_backup(expansions);
+    EXPECT_TRUE(htps_instance->is_proven());
+    htps_instance->get_result();
+}
+
+
+TEST_F(HTPSTest, TestVirtualLoss) {
+    auto params = dummyParams;
+    dummyParams.virtual_loss = 1;
+
+    htps_instance->set_params(dummyParams);
+
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+    // Create children for the root theorem.
+    std::vector<std::shared_ptr<htps::theorem>> children;
+    for (int i = 0; i < 2; i++) {
+        auto child = std::make_shared<DummyTheorem>("B");
+        children.push_back(child);
+    }
+
+    // Create a dummy expansion effect for the root theorem.
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {children[0]};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {children[1]};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac};
+    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{children[0]}, {children[1]}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == children[0]);
+
+    effects.clear();
+    effect->goal = children[0];
+    effect->tac = dummyTac2;
+    effect->children = {};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {children[0], 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+    htps_instance->expand_and_backup(expansions);
+    EXPECT_TRUE(htps_instance->is_proven());
+    auto res = htps_instance->get_result();
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = res.get_samples();
+    for (auto &sample: samples_tactic) {
+        EXPECT_TRUE(sample.get_inproof() == htps::InMinimalProof);
+    }
 }

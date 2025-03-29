@@ -56,17 +56,19 @@ Parameters
 
 - **metric** (*enum*):
   Metric used in minimal proof search. Options include:
+
   - `"depth"`
   - `"length"`
   - `"time"`
 
 - **node_mask** (*enum*):
   Specifies nodes returned as training examples:
-  - `"NoMask"`
-  - `"Solving"`
-  - `"Proof"`
-  - `"MinimalProof"`
-  - `"MinimalProofSolving"`
+
+  - `"NoMask"`: all samples are returned
+  - `"Solving"`: only samples from solved nodes are returned (does not require the root to be proven)
+  - `"Proof"`: only samples from proof nodes are returned (requires the root to be proven)
+  - `"MinimalProof"`: only samples from nodes on the minimal proof are returned
+  - `"MinimalProofSolving"`: same as `"MinimalProof"` if the root is proven, otherwise same as `"Solving"`
 
 - **effect_subsampling_rate** (*double*):
   Subsampling rate applied to effect samples.

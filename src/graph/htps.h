@@ -40,6 +40,7 @@ namespace htps {
                                                                                   tac(tac),
                                                                                   children(children) {}
 
+        HTPSSampleEffect() = default;
 
         std::shared_ptr<theorem> get_goal() const;
 
@@ -53,11 +54,11 @@ namespace htps {
     class HTPSSampleCritic {
     private:
         std::shared_ptr<theorem> goal;
-        double q_estimate;
-        bool solved;
-        bool bad;
-        double critic;
-        size_t visit_count;
+        double q_estimate{};
+        bool solved{};
+        bool bad{};
+        double critic{};
+        size_t visit_count{};
 
     public:
         HTPSSampleCritic(std::shared_ptr<theorem> goal, double q_estimate, bool solved, bool bad, double critic,
@@ -67,11 +68,37 @@ namespace htps {
             assert(q_estimate >= 0);
             assert(q_estimate <= 1 + 1e-4);
         }
+
+        HTPSSampleCritic() = default;
+
+        std::shared_ptr<theorem> get_goal() const {
+            return goal;
+        }
+
+        double get_q_estimate() const {
+            return q_estimate;
+        }
+
+        bool is_solved() const {
+            return solved;
+        }
+
+        bool is_bad() const {
+            return bad;
+        }
+
+        double get_critic() const {
+            return critic;
+        }
+
+        size_t get_visit_count() const {
+            return visit_count;
+        }
     };
 
     enum InProof {
         NotInProof,
-        InProof,
+        IsInProof,
         InMinimalProof,
         InProofCount
     };
@@ -97,6 +124,32 @@ namespace htps {
             assert(q_estimates.size() == tactics.size() || q_estimates.empty());
             assert(inproof != InProofCount);
             assert(!tactics.empty());
+        }
+
+        HTPSSampleTactics() = default;
+
+        std::shared_ptr<theorem> get_goal() const {
+            return goal;
+        }
+
+        std::vector<std::shared_ptr<tactic>> get_tactics() const {
+            return tactics;
+        }
+
+        std::vector<double> get_target_pi() const {
+            return target_pi;
+        }
+
+        enum InProof get_inproof() const {
+            return inproof;
+        }
+
+        std::vector<double> get_q_estimates() const {
+            return q_estimates;
+        }
+
+        size_t get_visit_count() const {
+            return visit_count;
         }
     };
 
@@ -301,13 +354,13 @@ namespace htps {
 
         void get_tactics_sample_q_conditioning(size_t count_threshold,
                                                std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                               std::vector<double> &valid_priors, std::vector<double> &valid_targets,
+                                               std::vector<double> &valid_targets,
                                                std::vector<double> &q_values) const;
 
         void
         get_tactics_sample_regular(Metric metric, NodeMask node_mask, bool only_learn_best_tactics, double p_threshold,
                                    std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                   std::vector<double> &valid_priors, std::vector<double> &valid_targets) const;
+                                   std::vector<double> &valid_targets) const;
 
         bool _validate() const;
 
@@ -407,12 +460,24 @@ namespace htps {
                 metric(metric), proof_samples_tactics(proof_samples_tactics), goal(goal),
                 p(p) {}
 
+        HTPSResult() = default;
+
         struct proof get_proof() const;
 
         std::shared_ptr<theorem> get_goal() const;
 
+        Metric get_metric() const;
+
         std::tuple<std::vector<HTPSSampleCritic>, std::vector<HTPSSampleTactics>, std::vector<HTPSSampleEffect>, Metric, std::vector<HTPSSampleTactics>>
         get_samples() const;
+
+        std::vector<HTPSSampleTactics> get_proof_samples() const;
+
+        std::vector<HTPSSampleCritic> get_critic_samples() const;
+
+        std::vector<HTPSSampleTactics> get_tactic_samples() const;
+
+        std::vector<HTPSSampleEffect> get_effect_samples() const;
     };
 
 /**

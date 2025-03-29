@@ -277,7 +277,6 @@ std::optional<HTPSSampleCritic> HTPSNode::get_critic_sample(double subsampling_r
 
 void HTPSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
                                                  std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                                 std::vector<double> &valid_priors,
                                                  std::vector<double> &valid_targets,
                                                  std::vector<double> &q_values) const {
     std::vector<size_t> selected_tactics_ids;
@@ -294,12 +293,10 @@ void HTPSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
         return;
     }
     valid_tactics.reserve(selected_tactics_ids.size());
-    valid_priors.reserve(selected_tactics_ids.size());
     valid_targets.reserve(selected_tactics_ids.size());
     q_values.reserve(selected_tactics_ids.size());
     for (const auto &id: selected_tactics_ids) {
         valid_tactics.push_back(tactics[id]);
-        valid_priors.push_back(priors[id]);
         valid_targets.push_back(-1.0); // Not used in this case
         // If the tactic solves the node, we assign a 1, if it is invalid, we assign a 0
         // Otherwise, use the average action value
@@ -317,14 +314,12 @@ void HTPSNode::get_tactics_sample_q_conditioning(size_t count_threshold,
     }
     assert (q_values.size() == valid_tactics.size());
     assert (q_values.size() == selected_tactics_ids.size());
-    assert (q_values.size() == valid_priors.size());
     assert (q_values.size() == valid_targets.size());
 }
 
 void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
                                           bool only_learn_best_tactics, double p_threshold,
                                           std::vector<std::shared_ptr<tactic>> &valid_tactics,
-                                          std::vector<double> &valid_priors,
                                           std::vector<double> &valid_targets) const {
     if (all_tactics_killed())
         return;
@@ -347,12 +342,10 @@ void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
         assert(!selected_tactic_ids.empty());
     }
     valid_tactics.reserve(selected_tactic_ids.size());
-    valid_priors.reserve(selected_tactic_ids.size());
     valid_targets.reserve(selected_tactic_ids.size());
 
     for (const auto &id: selected_tactic_ids) {
         valid_tactics.push_back(tactics[id]);
-        valid_priors.push_back(priors[id]);
     }
 
     if (n_solving_tactics() <= 0) {
@@ -366,7 +359,6 @@ void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
         std::fill(valid_targets.begin(), valid_targets.begin(), 1.0 / static_cast<double>(tactics.size()));
     }
     assert(selected_tactic_ids.size() == valid_targets.size());
-    assert(selected_tactic_ids.size() == valid_priors.size());
     assert(selected_tactic_ids.size() == valid_tactics.size());
 }
 
@@ -378,6 +370,8 @@ std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, Nod
     }
 
     switch (node_mask) {
+        case None:
+            break;
         case Solving:
             if (n_solving_tactics() <= 0)
                 return std::nullopt;
@@ -395,15 +389,13 @@ std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, Nod
     }
 
     std::vector<std::shared_ptr<tactic>> valid_tactics;
-    std::vector<double> valid_priors;
     std::vector<double> valid_targets;
     std::vector<double> q_values;
 
     if (for_q_conditioning)
-        get_tactics_sample_q_conditioning(count_threshold, valid_tactics, valid_priors, valid_targets, q_values);
+        get_tactics_sample_q_conditioning(count_threshold, valid_tactics,valid_targets, q_values);
     else
-        get_tactics_sample_regular(metric, node_mask, only_learn_best_tactics, p_threshold,
-                                   valid_tactics, valid_priors, valid_targets);
+        get_tactics_sample_regular(metric, node_mask, only_learn_best_tactics, p_threshold, valid_tactics, valid_targets);
     // If the above fails, return an empty optional
     if (valid_tactics.empty())
         return std::nullopt;
@@ -412,7 +404,7 @@ std::optional<HTPSSampleTactics> HTPSNode::get_tactics_sample(Metric metric, Nod
     if (in_minimum_proof.get(metric)) {
         inproof = InProof::InMinimalProof;
     } else if (is_in_proof()) {
-        inproof = InProof::InProof;
+        inproof = InProof::IsInProof;
     } else {
         inproof = InProof::NotInProof;
     }
@@ -441,7 +433,7 @@ void HTPSNode::compute_policy(std::vector<double> &result, bool force_expansion)
     std::vector<double> q_values(tactics.size(), tactic_init_value);
     for (size_t i = 0; i < tactics.size(); i++) {
         if (full_counts[i] > 0) {
-            assert(!reset_mask[i]);
+            assert(!reset_mask[i] || counts[i] == 0);
             q_values[i] = std::exp(log_w[i]) / static_cast<double>(full_counts[i]);
         }
     }
@@ -987,6 +979,7 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
             initial_minimum_proof_size.set(static_cast<Metric>(i),
                                            nodes.at(root)->minimum_length(static_cast<Metric>(i)));
             assert(initial_minimum_proof_size.has_value(static_cast<Metric>(i)));
+            assert(nodes.at(root)->is_in_minimum_proof(static_cast<Metric>(i)));
         }
         reset_minimum_proof_stats();
     }
@@ -1061,3 +1054,22 @@ HTPSResult::get_samples() const {
     return {samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics};
 }
 
+std::vector<HTPSSampleTactics> HTPSResult::get_proof_samples() const {
+    return proof_samples_tactics;
+}
+
+std::vector<HTPSSampleCritic> HTPSResult::get_critic_samples() const {
+    return samples_critic;
+}
+
+std::vector<HTPSSampleTactics> HTPSResult::get_tactic_samples() const {
+    return samples_tactic;
+}
+
+std::vector<HTPSSampleEffect> HTPSResult::get_effect_samples() const {
+    return samples_effect;
+}
+
+Metric HTPSResult::get_metric() const {
+    return metric;
+}

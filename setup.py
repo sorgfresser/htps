@@ -1,4 +1,5 @@
 from setuptools import setup, Extension
+import os
 
 module = Extension(
     "htps",
@@ -13,11 +14,25 @@ module = Extension(
     define_macros=[],
 )
 
+directory = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(directory, "README.md"), encoding="utf-8") as f:
+    long_description = f.read()
+
+
 setup(
     name="htps",
-    author="Ash Vardanian",
-    license="Apache-2.0",
     include_dirs=[],
     setup_requires=[],
+    license="Apache-2.0",
+    license_files=("LICENSE",),
+    author="Simon Sorg",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    classifiers=[
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3",
+    ],
     ext_modules=[module],
+    description="Open-source implementation of HyperTree Proof Search",
+    version="0.1.0",
 )

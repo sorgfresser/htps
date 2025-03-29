@@ -1016,8 +1016,8 @@ PyObject* Theorem_NewFromShared(const std::shared_ptr<htps::theorem>& thm_ptr) {
     c_obj->set_context(thm->context);
     c_obj->hypotheses = thm->hypotheses;
     c_obj->past_tactics = thm->past_tactics;
-    c_obj->py_dict = thm->py_dict;
-    Py_INCREF(c_obj->py_dict);
+//    c_obj->py_dict = thm->py_dict;
+//    Py_INCREF(c_obj->py_dict);
     return obj;
 }
 

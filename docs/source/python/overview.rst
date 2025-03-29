@@ -38,6 +38,8 @@ To construct a new theorem, use the ``Theorem`` constructor.
    theorem = Theorem(conclusion="p ∧ q", unique_string="p ∧ q",
         hypotheses=[Hypothesis("p", "p"), Hypothesis("q", "q")],
         context=context, past_tactics=[])
+   theorem.metadata = {"key": "value"} # Arbitrary metadata that you might need
+   print(theorem.metadata)
 
 Now that we have a theorem in place, we can start the search.
 The search algorithm is implemented in the ``HTPS`` class, which is the main entry point for the algorithm.

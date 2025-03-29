@@ -6,7 +6,9 @@ module = Extension(
     sources=[
         "python/htps.cpp", "src/graph/lean.cpp", "src/graph/htps.cpp",
         "src/graph/base.cpp", "src/graph/graph.cpp", "src/env/core.cpp",
-        "src/model/policy.cpp"
+        "src/model/policy.cpp", "python/htps.h", "src/graph/lean.h",
+        "src/graph/htps.h", "src/graph/base.h", "src/graph/graph.h",
+        "src/env/core.h", "src/model/policy.h",
     ],
     include_dirs=["src", "external/glob/single_include"],
     extra_compile_args=["-std=c++20", "-O3", "-pedantic", "-DPYTHON_BINDINGS"],
@@ -33,5 +35,5 @@ setup(
     ],
     ext_modules=[module],
     description="Open-source implementation of HyperTree Proof Search",
-    version="0.0.2",
+    version="0.0.3",
 )

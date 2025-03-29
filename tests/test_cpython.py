@@ -96,9 +96,9 @@ def test_theorem_context():
     assert theorem.unique_string == ""
     assert theorem.conclusion == ""
     assert theorem.context.namespaces == context.namespaces
-    # assert theorem.metadata == {}
-    # theorem.metadata = {"key": "value"}
-    # assert theorem.metadata == {"key": "value"}
+    assert theorem.metadata == {}
+    theorem.metadata = {"key": "value"}
+    assert theorem.metadata == {"key": "value"}
     context2 = Context(["a∧a"])
     theorem.context = context2
     assert theorem.context.namespaces == context2.namespaces
@@ -387,15 +387,15 @@ def test_htps_expansion():
     tactics = []
     theorem = Theorem("andb∧", "A", hypotheses, context, tactics)
     theorem2 = Theorem("andb∧d", "B", hypotheses, context, tactics)
-    # theorem.metadata = {"key": "value"}
+    theorem.metadata = {"key": "value"}
     params = SearchParams(0.3, PolicyType.RPO, 10, 3, True, True, True, True, 0.99, 10, True, True, True, 0.0, QValueSolved.One, 0.7, Metric.Time, NodeMask.NoMask, 1.0, 1.0, True, 1)
     search = HTPS(theorem, params)
 
     # Will find the root
     theorems = search.theorems_to_expand()
-    # assert len(theorems) == 1
-    # _compare_theorem(theorems[0], theorem)
-    # assert theorems[0].metadata == {"key": "value"}
+    assert len(theorems) == 1
+    _compare_theorem(theorems[0], theorem)
+    assert theorems[0].metadata == {"key": "value"}
 
     env_durations = [1, 1]
     log_critic = -0.5

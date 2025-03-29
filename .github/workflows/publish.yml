@@ -29,6 +29,7 @@ jobs:
       - name: Get source distribution
         run: |
           python setup.py sdist
+        working-directory: ${{ github.workspace }}
 
       - name: Publish to PyPI
         run: |

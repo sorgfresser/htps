@@ -641,6 +641,9 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
 
     auto json = nlohmann::json(*htps_instance);
     dump_json_to_file(json, "samples/test2.json");
+
+    auto json2 = nlohmann::json(expansion);
+    dump_json_to_file(json2, "samples/test3.json");
 }
 
 

@@ -47,5 +47,6 @@ Contents
    python/overview
    python/results
    python/params
+   python/debugging
    python/htps
    cpp/htps

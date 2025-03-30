@@ -271,7 +271,7 @@ std::optional<HTPSSampleCritic> HTPSNode::get_critic_sample(double subsampling_r
     }
     // Compute visit count of the node by summing up all action counts
     size_t visit_sum = std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0));
-    return HTPSSampleCritic(thm, std::exp(get_value()), solved, false, log_critic_value, visit_sum);
+    return HTPSSampleCritic(thm, std::exp(get_value()), is_solved(), is_bad(), log_critic_value, visit_sum);
 }
 
 
@@ -661,6 +661,9 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
     to_process.push_back(root);
 
     while (!to_process.empty()) {
+#ifdef VERBOSE_PRINTS
+        printf("To process\n");
+#endif
         node_policy.clear();
         std::shared_ptr<theorem> current = to_process.front();
         to_process.pop_front();
@@ -803,7 +806,7 @@ void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
                 expansion->thm, expansion->tactics, expansion->children_for_tactic, policy, expansion->priors,
                 params.exploration, expansion->log_critic, params.q_value_solved, params.tactic_init_value,
                 expansion->effects);
-        receive_expansion(expansion->thm, expansion->log_critic, true);
+        receive_expansion(expansion->thm, expansion->log_critic, false);
         nodes.push_back(current);
     }
     add_nodes(nodes);
@@ -915,7 +918,20 @@ void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
         single_to_expand.clear();
         std::vector<std::shared_ptr<theorem>> terminal;
         std::vector<std::shared_ptr<theorem>> to_expand;
-        Simulation sim = find_leaves_to_expand(terminal, to_expand);
+        Simulation sim;
+        while (!dead_root()) {
+            try {
+                sim = find_leaves_to_expand(terminal, to_expand);
+                break;
+            } catch (FailedTacticException &e) {
+                terminal.clear();
+                to_expand.clear();
+                continue;
+            }
+        }
+        if (dead_root())
+            break;
+
         if (to_expand.empty()) {
 #ifdef VERBOSE_PRINTS
             printf("To expand is empty!");

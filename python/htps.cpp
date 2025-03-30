@@ -1,7 +1,6 @@
 #include "./htps.h"
 #include <structmember.h>
 #include "../src/graph/htps.h"
-#include "../src/graph/lean.h"
 
 static PyObject *PolicyTypeEnum = NULL;
 static PyObject *QValueSolvedEnum = NULL;
@@ -164,7 +163,24 @@ int get_enum_value(PyObject *obj, const char *name) {
         value = (int) PyLong_AsLong(val);
         Py_DECREF(val);
     }
-return value;
+    return value;
+}
+
+
+static PyObject *PyObject_from_string(const std::string &str) {
+    return PyUnicode_FromString(str.c_str());
+}
+
+static std::string PyObject_to_string(PyObject *obj) {
+    if (!PyUnicode_Check(obj)) {
+        throw std::invalid_argument("Expected a Unicode object");
+    }
+    const char *utf8_str = PyUnicode_AsUTF8(obj);
+    if (!utf8_str) {
+        // PyUnicode_AsUTF8 returns NULL and sets an exception if conversion fails.
+        throw std::runtime_error("Failed to convert PyObject to a UTF-8 string");
+    }
+    return {utf8_str};
 }
 
 
@@ -488,7 +504,7 @@ PyObject_HEAD_INIT(NULL) "htps.Hypothesis",
 
 
 static PyObject *Tactic_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::lean_tactic*) type->tp_alloc(type, 0);
+    auto *self = (htps::tactic*) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
@@ -498,7 +514,7 @@ static PyObject *Tactic_new(PyTypeObject *type, PyObject *args, PyObject *kwargs
 }
 
 static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    auto *t = (htps::lean_tactic *) self;
+    auto *t = (htps::tactic *) self;
     const char *unique_str = nullptr;
     int is_valid;
     size_t duration;
@@ -513,16 +529,16 @@ static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 
 static PyMemberDef TacticMembers[] = {
-    {"unique_string", T_STRING, offsetof(htps::lean_tactic, unique_string), READONLY, "Unique identifier for a tactic"},
-    {"is_valid", T_BOOL, offsetof(htps::lean_tactic, is_valid), READONLY, "Whether the tactic is valid or not"},
-    {"duration", T_LONG, offsetof(htps::lean_tactic, duration), READONLY, "Duration in milliseconds"},
+    {"unique_string", T_STRING, offsetof(htps::tactic, unique_string), READONLY, "Unique identifier for a tactic"},
+    {"is_valid", T_BOOL, offsetof(htps::tactic, is_valid), READONLY, "Whether the tactic is valid or not"},
+    {"duration", T_LONG, offsetof(htps::tactic, duration), READONLY, "Duration in milliseconds"},
     {NULL}
 };
 
 
 static PyTypeObject TacticType = {
     PyObject_HEAD_INIT(NULL) "htps.Tactic",
-    sizeof(htps::lean_tactic),
+    sizeof(htps::tactic),
     0,
     NULL,
     NULL,
@@ -562,7 +578,7 @@ static PyTypeObject TacticType = {
 
 
 static PyObject *Context_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::lean_context*) type->tp_alloc(type, 0);
+    auto *self = (htps::context*) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
@@ -572,7 +588,7 @@ static PyObject *Context_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
 }
 
 static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    auto *c = (htps::lean_context *) self;
+    auto *c = (htps::context *) self;
     static char *kwlist[] = { (char*)"namespaces", NULL };
     PyObject *namespace_set, *iterator;
 
@@ -604,13 +620,13 @@ static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 static PyObject* Context_get_namespaces(PyObject *self, void* closure) {
-    auto *context = (htps::lean_context *) self;
+    auto *context = (htps::context *) self;
     PyObject *py_list = PyList_New(context->namespaces.size());
     if (!py_list)
         return NULL;
     size_t i = 0;
     for (const auto &ns : context->namespaces) {
-        PyObject *py_str = PyUnicode_FromString(ns.c_str());
+        PyObject *py_str = PyObject_from_string(ns);
         if (!py_str) {
             Py_DECREF(py_list);
             return NULL;
@@ -621,7 +637,7 @@ static PyObject* Context_get_namespaces(PyObject *self, void* closure) {
 }
 
 static int Context_set_namespaces(PyObject *self, PyObject *value, void *closure) {
-    auto *context = (htps::lean_context *) self;
+    auto *context = (htps::context *) self;
     PyObject * iterator = PyObject_GetIter(value);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "namespaces must be iterable");
@@ -653,14 +669,14 @@ static PyGetSetDef Context_getsetters[] = {
 };
 
 static void Context_dealloc(PyObject* self) {
-    auto *ctx = (htps::lean_context*) self;
+    auto *ctx = (htps::context*) self;
      ctx->namespaces.~set<std::string>();
     Py_TYPE(self)->tp_free(self);
 }
 
 static PyTypeObject ContextType = {
     PyObject_HEAD_INIT(NULL) "htps.Context",
-sizeof(htps::lean_context),
+sizeof(htps::context),
 0,
 Context_dealloc,
 NULL,
@@ -700,63 +716,88 @@ NULL,
 
 
 static void Theorem_dealloc(PyObject *self) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     thm->conclusion.~basic_string();
     thm->hypotheses.~vector();
     thm->unique_string.~basic_string();
-    thm->context.~lean_context();
+    thm->ctx.~context();
     thm->past_tactics.~vector();
-    Py_XDECREF(thm->py_dict);
+    for (const auto &pair : thm->metadata) {
+        if (pair.second.type() == typeid(PyObject*)) {
+            Py_XDECREF(std::any_cast<PyObject*>(pair.second));
+        }
+    }
+    thm->metadata.~unordered_map();
     Py_TYPE(self)->tp_free(self);
 }
 
 static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::lean_theorem *) type->tp_alloc(type, 0);
+    auto *self = (htps::theorem *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
-    self->py_dict = PyDict_New();
-    if (self->py_dict == NULL) {
-        Py_DECREF(self);
-        return NULL;
-    }
+
     new (&(self->conclusion)) std::string();
     new (&(self->hypotheses)) std::vector<htps::hypothesis>();
     new (&(self->unique_string)) std::string();
-    new (&(self->context)) htps::lean_context();
-    new (&(self->past_tactics)) std::vector<htps::lean_tactic>();
+    new (&(self->ctx)) htps::context();
+    new (&(self->past_tactics)) std::vector<htps::tactic>();
+    new (&(self->metadata)) std::unordered_map<std::string, std::string>();
 
     return (PyObject *) self;
 }
 
 static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
-    auto *t = (htps::lean_theorem *) self;
+    auto *t = (htps::theorem *) self;
     const char *unique_str = nullptr;
     const char *conclusion = nullptr;
-    PyObject *context, *hypotheses, *past_tactics;
-    static char *kwlist[] = { (char*)"conclusion", (char*)"unique_string", (char*)"hypotheses", (char*)"context", (char*)"past_tactics", NULL };
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssOOO", kwlist, &conclusion, &unique_str, &hypotheses, &context, &past_tactics))
+    PyObject *context, *hypotheses, *past_tactics, *metadata;
+    metadata = NULL;
+    static const char *kwlist[] = { "conclusion", "unique_string", "hypotheses", "context", "past_tactics", "metadata",NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssOOO|O", const_cast<char**>(kwlist), &conclusion, &unique_str, &hypotheses, &context, &past_tactics, &metadata))
         return -1;
-    t->unique_string = unique_str;
-    t->conclusion = conclusion;
 
     if (!PyObject_TypeCheck(context, &ContextType)) {
         PyErr_SetString(PyExc_TypeError, "context must be a Context object");
         return -1;
     }
-    auto *c_ctx = (htps::lean_context*) context;
-    // Copy underlying Lean context
-    t->set_context(*c_ctx);
+    bool metadata_created = false; // A bit ugly, but we have to decref this later if we created it
+    if (metadata == nullptr || metadata == Py_None) {
+        metadata = PyDict_New();
+        if (!metadata) {
+            return -1;
+        }
+        metadata_created = true;
+    }
+    if (!PyObject_TypeCheck(metadata, &PyDict_Type)) {
+        PyErr_SetString(PyExc_TypeError, "metadata must be a dict");
+        return -1;
+    }
+    // Throw python objects into unordered map directly
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    std::unordered_map<std::string, std::any> metadata_map;
+    while (PyDict_Next(metadata, &pos, &key, &value)) {
+        if (!PyUnicode_Check(key)) {
+            PyErr_SetString(PyExc_TypeError, "metadata keys must be strings");
+            return -1;
+        }
+        const char *k = PyUnicode_AsUTF8(key);
+        Py_INCREF(value);
+        metadata_map[k] = value;
+    }
+    if (metadata_created) {
+        Py_DECREF(metadata);
+    }
 
+    std::vector<htps::hypothesis> theses;
     PyObject *iterator = PyObject_GetIter(hypotheses);
     if (!iterator) {
-    PyErr_SetString(PyExc_TypeError, "hypotheses must be iterable!");
-    return -1;
+        PyErr_SetString(PyExc_TypeError, "hypotheses must be iterable!");
+        return -1;
     }
-    std::vector<htps::hypothesis> theses;
     PyObject *item;
-    t->hypotheses.clear();
     while ((item = PyIter_Next(iterator))) {
         if (!PyObject_TypeCheck(item, &HypothesisType)) {
             PyErr_SetString(PyExc_TypeError, "each hypothesis must be a Hypothesis object");
@@ -769,15 +810,13 @@ static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    t->hypotheses = theses;
 
     iterator = PyObject_GetIter(past_tactics);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "past_tactics must be iterable!");
         return -1;
     }
-    std::vector<htps::lean_tactic> tacs;
-    t->reset_tactics();
+    std::vector<htps::tactic> tacs;
     while ((item = PyIter_Next(iterator))) {
         if (!PyObject_TypeCheck(item, &TacticType)) {
             PyErr_SetString(PyExc_TypeError, "each tactic must be a Tactic object");
@@ -785,26 +824,34 @@ static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
             Py_DECREF(iterator);
             return -1;
         }
-        auto *tactic = (htps::lean_tactic*) item;
+        auto *tactic = (htps::tactic*) item;
         tacs.push_back(*tactic);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
+
+    auto *c_ctx = (htps::context*) context;
+    // Copy underlying Lean context
+    t->set_context(*c_ctx);
+    t->unique_string = unique_str;
+    t->conclusion = conclusion;
+    t->hypotheses = theses;
+    t->metadata = metadata_map;
     t->set_tactics(tacs);
     return 0;
 }
 
 static PyObject *Theorem_get_context(PyObject *self, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
-    auto *new_ctx = (htps::lean_context *) Context_new(&ContextType, NULL, NULL);
+    auto *thm = (htps::theorem *) self;
+    auto *new_ctx = (htps::context *) Context_new(&ContextType, NULL, NULL);
     if (!new_ctx)
         return PyErr_NoMemory();
-    new_ctx->namespaces = thm->context.namespaces;
+    new_ctx->namespaces = thm->ctx.namespaces;
     return (PyObject*) new_ctx;
 }
 
 static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new context is not set");
         return -1;
@@ -813,13 +860,13 @@ static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "context must be a Context object");
         return -1;
     }
-    auto *new_ctx = (htps::lean_context *) value;
+    auto *new_ctx = (htps::context *) value;
     thm->set_context(*new_ctx);
     return 0;
 }
 
 static PyObject *Theorem_get_hypotheses(PyObject *self, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     PyObject *list = PyList_New(thm->hypotheses.size());
     if (!list)
         return PyErr_NoMemory();
@@ -844,7 +891,7 @@ static PyObject *Theorem_get_hypotheses(PyObject *self, void *closure) {
 
 
 static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new hypotheses is not set");
         return -1;
@@ -875,7 +922,7 @@ static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure
 }
 
 static PyObject *Theorem_get_past_tactics(PyObject *self, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     PyObject *list = PyList_New(thm->past_tactics.size());
     if (!list)
         return PyErr_NoMemory();
@@ -898,7 +945,7 @@ static PyObject *Theorem_get_past_tactics(PyObject *self, void *closure) {
 }
 
 static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new past tactics is not set");
         return -1;
@@ -908,7 +955,7 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
         PyErr_SetString(PyExc_TypeError, "past_tactics must be an iterable");
         return -1;
     }
-    std::vector<htps::lean_tactic> new_tactics;
+    std::vector<htps::tactic> new_tactics;
     PyObject *item;
     while ((item = PyIter_Next(iterator)) != NULL) {
         if (!PyObject_TypeCheck(item, &TacticType)) {
@@ -917,7 +964,7 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
             Py_DECREF(iterator);
             return -1;
         }
-        auto *tactic = (htps::lean_tactic*) item;
+        auto *tactic = (htps::tactic*) item;
         new_tactics.push_back(*tactic);
         Py_DECREF(item);
     }
@@ -927,13 +974,44 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
 }
 
 static PyObject *Theorem_get_dict(PyObject *self, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
-    Py_INCREF(thm->py_dict);
-    return thm->py_dict;
+    auto *thm = (htps::theorem *) self;
+    // Convert metadata to PyDict
+    PyObject *py_dict = PyDict_New();
+    if (!py_dict)
+        return PyErr_NoMemory();
+    for (const auto &pair : thm->metadata) {
+        PyObject *key = PyObject_from_string(pair.first);
+        if (!key) {
+            Py_DECREF(py_dict);
+            return NULL;
+        }
+        PyObject *value;
+        if (pair.second.type() == typeid(PyObject*)) {
+            value = std::any_cast<PyObject*>(pair.second);
+            Py_INCREF(value);
+        } else {
+            PyErr_SetString(PyExc_RuntimeError, "some metadata value is not a PyObject");
+            Py_DECREF(key);
+            Py_DECREF(py_dict);
+            return NULL;
+        }
+        if (!value) {
+            Py_DECREF(key);
+            Py_DECREF(py_dict);
+            return NULL;
+        }
+        if (PyDict_SetItem(py_dict, key, value) < 0) {
+            Py_DECREF(key);
+            Py_DECREF(value);
+            Py_DECREF(py_dict);
+            return NULL;
+        }
+    }
+    return py_dict;
 }
 
 static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::lean_theorem *) self;
+    auto *thm = (htps::theorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new dictionary is not set");
         return -1;
@@ -942,17 +1020,37 @@ static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "new dictionary must be a dict");
         return -1;
     }
-    Py_XDECREF(thm->py_dict);
-    Py_INCREF(value);
-    thm->py_dict = value;
+    std::unordered_map<std::string, std::any> new_metadata;
+    PyObject *key, *val;
+    Py_ssize_t pos = 0;
+    while (PyDict_Next(value, &pos, &key, &val)) {
+        if (!PyUnicode_Check(key)) {
+            PyErr_SetString(PyExc_TypeError, "metadata keys must be strings");
+            return -1;
+        }
+        const char *k = PyUnicode_AsUTF8(key);
+        if (!k) {
+            PyErr_SetString(PyExc_RuntimeError, "could not convert key to string");
+            return -1;
+        }
+        Py_INCREF(val);
+        new_metadata[k] = val;
+    }
+
+    for (const auto &pair : thm->metadata) {
+        if (pair.second.type() == typeid(PyObject*)) {
+            Py_XDECREF(std::any_cast<PyObject*>(pair.second));
+        }
+    }
+    thm->metadata = new_metadata;
     return 0;
 }
 
 
 
 static PyMemberDef Theorem_members[] = {
-    {"conclusion", T_STRING, offsetof(htps::lean_theorem, conclusion), READONLY, "Conclusion of the theorem"},
-    {"unique_string", T_STRING, offsetof(htps::lean_theorem, unique_string), READONLY, "Unique string of the theorem"},
+    {"conclusion", T_STRING, offsetof(htps::theorem, conclusion), READONLY, "Conclusion of the theorem"},
+    {"unique_string", T_STRING, offsetof(htps::theorem, unique_string), READONLY, "Unique string of the theorem"},
     {NULL}
 };
 
@@ -966,7 +1064,7 @@ static PyGetSetDef Theorem_getsetters[] = {
 
 static PyTypeObject TheoremType = {
     PyObject_HEAD_INIT(NULL) "htps.Theorem",
-sizeof(htps::lean_theorem),
+sizeof(htps::theorem),
 0,
 (destructor)Theorem_dealloc,
 NULL,
@@ -1006,27 +1104,37 @@ NULL,
 
 
 PyObject* Theorem_NewFromShared(const std::shared_ptr<htps::theorem>& thm_ptr) {
-    auto thm = std::dynamic_pointer_cast<htps::lean_theorem>(thm_ptr);
+    auto thm = std::dynamic_pointer_cast<htps::theorem>(thm_ptr);
     PyObject *obj = Theorem_new(&TheoremType, NULL, NULL);
     if (obj == NULL)
         return NULL;
-    auto *c_obj = (htps::lean_theorem *) obj;
+    auto *c_obj = (htps::theorem *) obj;
     c_obj->conclusion = thm->conclusion;
     c_obj->unique_string  = thm->unique_string;
-    c_obj->set_context(thm->context);
+    c_obj->set_context(thm->ctx);
     c_obj->hypotheses = thm->hypotheses;
     c_obj->past_tactics = thm->past_tactics;
-    Py_INCREF(c_obj->py_dict);
-    c_obj->py_dict = thm->py_dict;
+    std::unordered_map<std::string, std::any> metadata;
+    for (const auto &pair : thm->metadata) {
+        if (pair.second.type() == typeid(PyObject*)) {
+            auto *value = std::any_cast<PyObject*>(pair.second);
+            Py_INCREF(value);
+            metadata[pair.first] = value;
+        } else {
+            metadata[pair.first] = pair.second;
+        }
+    }
+    c_obj->metadata = metadata;
+
     return obj;
 }
 
 PyObject* Tactic_NewFromShared(const std::shared_ptr<htps::tactic>& tac_ptr) {
-    auto tac = std::dynamic_pointer_cast<htps::lean_tactic>(tac_ptr);
+    auto tac = std::dynamic_pointer_cast<htps::tactic>(tac_ptr);
     PyObject *obj = Tactic_new(&TacticType, NULL, NULL);
     if (obj == NULL)
         return NULL;
-    auto *c_obj = (htps::lean_tactic *) obj;
+    auto *c_obj = (htps::tactic *) obj;
     c_obj->unique_string = tac->unique_string;
     c_obj->is_valid = tac->is_valid;
     c_obj->duration = tac->duration;
@@ -1040,8 +1148,8 @@ static PyObject *EnvEffect_new(PyTypeObject *type, PyObject *args, PyObject *kwa
     auto *self = (htps::env_effect *)type->tp_alloc(type, 0);
     if (self == NULL)
         return PyErr_NoMemory();
-    auto shared_thm = static_pointer_cast<htps::lean_theorem>(std::make_shared<htps::lean_theorem>());
-    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>());
+    auto shared_thm = static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>());
+    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>());
     self->goal = shared_thm;
     self->children = std::vector<std::shared_ptr<htps::theorem>>();
     self->tac = shared_tactic;
@@ -1076,17 +1184,17 @@ static int EnvEffect_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             Py_DECREF(iterator);
             return -1;
         }
-        auto lean_thm = (htps::lean_theorem *) item;
-        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+        auto thm = (htps::theorem *) item;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*thm));
         children_vec.push_back(shared_thm);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
     auto *eff = (htps::env_effect *) self;
-    auto lean_thm = (htps::lean_theorem *) py_goal;
-    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
-    auto lean_tactic = (htps::lean_tactic *) py_tac;
-    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*lean_tactic));
+    auto thm = (htps::theorem *) py_goal;
+    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*thm));
+    auto tactic = (htps::tactic *) py_tac;
+    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tactic));
     eff->goal = shared_thm;
     eff->tac = shared_tactic;
     eff->children = children_vec;
@@ -1108,8 +1216,8 @@ static int EnvEffect_set_goal(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
         return -1;
     }
-    auto lean_thm = (htps::lean_theorem *) value;
-    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+    auto thm = (htps::theorem *) value;
+    auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*thm));
     effect->goal = shared_thm;
     return 0;
 }
@@ -1129,8 +1237,8 @@ static int EnvEffect_set_tac(PyObject *self, PyObject *value, void *closure) {
         return -1;
     }
     auto *effect = (htps::env_effect *) self;
-    auto lean_tac = (htps::lean_tactic *) value;
-    auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*lean_tac));
+    auto tac = (htps::tactic *) value;
+    auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
     effect->tac = shared_tac;
     return 0;
 }
@@ -1172,8 +1280,8 @@ static int EnvEffect_set_children(PyObject *self, PyObject *value, void *closure
             Py_DECREF(iter);
             return -1;
         }
-        auto lean_thm = (htps::lean_theorem *) item;
-        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*lean_thm));
+        auto thm = (htps::theorem *) item;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*thm));
         new_children.push_back(shared_thm);
         Py_DECREF(item);
     }
@@ -1274,8 +1382,8 @@ static int EnvExpansion_set_thm(PyObject *self, PyObject *value, void *closure) 
         return -1;
     }
     auto *obj = (PyEnvExpansion *)self;
-    auto *c_thm = (htps::lean_theorem *) value;
-    obj->expansion.thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+    auto *c_thm = (htps::theorem *) value;
+    obj->expansion.thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*c_thm));
     return 0;
 }
 
@@ -1441,8 +1549,8 @@ static int EnvExpansion_set_tactics(PyObject *self, PyObject *value, void *closu
             Py_DECREF(iter);
             return -1;
         }
-        auto *tac = (htps::lean_tactic *) item;
-        auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*tac));
+        auto *tac = (htps::tactic *) item;
+        auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
         tactics.push_back(shared_tac);
         Py_DECREF(item);
     }
@@ -1506,8 +1614,8 @@ static int EnvExpansion_set_children_for_tactic(PyObject *self, PyObject *value,
                 Py_DECREF(iter_outer);
                 return -1;
             }
-            auto *thm = (htps::lean_theorem *) item_inner;
-            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*thm));
+            auto *thm = (htps::theorem *) item_inner;
+            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*thm));
             inner.push_back(shared_thm);
             Py_DECREF(item_inner);
         }
@@ -1559,22 +1667,6 @@ static int EnvExpansion_set_priors(PyObject *self, PyObject *value, void *closur
     Py_DECREF(iter);
     obj->expansion.priors = priors;
     return 0;
-}
-
-static PyObject *PyObject_from_string(const std::string &str) {
-    return PyUnicode_FromString(str.c_str());
-}
-
-static std::string PyObject_to_string(PyObject *obj) {
-    if (!PyUnicode_Check(obj)) {
-        throw std::invalid_argument("Expected a Unicode object");
-    }
-    const char *utf8_str = PyUnicode_AsUTF8(obj);
-    if (!utf8_str) {
-        // PyUnicode_AsUTF8 returns NULL and sets an exception if conversion fails.
-        throw std::runtime_error("Failed to convert PyObject to a UTF-8 string");
-    }
-    return {utf8_str};
 }
 
 static PyObject *EnvExpansion_get_error(PyObject *self, void *closure) {
@@ -1634,8 +1726,8 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 PyErr_SetString(PyExc_TypeError, "thm must be a Theorem object");
                 return -1;
             }
-            auto *c_thm = (htps::lean_theorem *)py_thm;
-            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+            auto *c_thm = (htps::theorem *)py_thm;
+            auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*c_thm));
 
             std::vector<size_t> env_durations;
             PyObject *iter = PyObject_GetIter(py_env_durations);
@@ -1687,8 +1779,8 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                     Py_DECREF(iter);
                     return -1;
                 }
-                auto *tac = (htps::lean_tactic *) item;
-                auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*tac));
+                auto *tac = (htps::tactic *) item;
+                auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
                 tactics.push_back(shared_tac);
                 Py_DECREF(item);
             }
@@ -1718,8 +1810,8 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                         Py_DECREF(iter);
                         return -1;
                     }
-                    auto *child = (htps::lean_theorem *) inner_item;
-                    auto shared_child = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*child));
+                    auto *child = (htps::theorem *) inner_item;
+                    auto shared_child = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*child));
                     inner.push_back(shared_child);
                     Py_DECREF(inner_item);
                 }
@@ -1776,8 +1868,8 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             PyErr_SetString(PyExc_TypeError, "thm must be a Theorem object");
             return -1;
         }
-        auto *c_thm = (htps::lean_theorem *)py_thm;
-        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*c_thm));
+        auto *c_thm = (htps::theorem *)py_thm;
+        auto shared_thm = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*c_thm));
         std::vector<size_t> env_durations;
         PyObject *iter = PyObject_GetIter(py_env_durations);
         if (!iter) {
@@ -1912,8 +2004,8 @@ static int PyHTPSSampleEffect_init(PyHTPSSampleEffect *self, PyObject *args, PyO
         PyErr_SetString(PyExc_TypeError, "tactic must be a Tactic object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*(htps::lean_theorem*)py_goal));
-    std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*(htps::lean_tactic*)py_tac));
+    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*(htps::theorem*)py_goal));
+    std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*(htps::tactic*)py_tac));
     std::vector<std::shared_ptr<htps::theorem>> children;
     PyObject *iter = PyObject_GetIter(py_children);
     if (!iter) {
@@ -1928,7 +2020,7 @@ static int PyHTPSSampleEffect_init(PyHTPSSampleEffect *self, PyObject *args, PyO
             Py_DECREF(iter);
             return -1;
         }
-        std::shared_ptr<htps::theorem> child = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*(htps::lean_theorem*)item));
+        std::shared_ptr<htps::theorem> child = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*(htps::theorem*)item));
         children.push_back(child);
         Py_DECREF(item);
     }
@@ -2048,7 +2140,7 @@ static int PyHTPSSampleCritic_init(PyHTPSSampleCritic *self, PyObject *args, PyO
         PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*(htps::lean_theorem*)py_goal));
+    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*(htps::theorem*)py_goal));
     self->cpp_obj.~HTPSSampleCritic();
     new (&self->cpp_obj) htps::HTPSSampleCritic(goal, q_estimate, solved ? true : false, bad ? true : false, critic, visit_count);
     return 0;
@@ -2178,7 +2270,7 @@ static int PyHTPSSampleTactics_init(PyHTPSSampleTactics *self, PyObject *args, P
         PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*(htps::lean_theorem*)py_goal));
+    std::shared_ptr<htps::theorem> goal = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*(htps::theorem*)py_goal));
 
     std::vector<std::shared_ptr<htps::tactic>> tactics;
     PyObject *iter = PyObject_GetIter(py_tactics);
@@ -2194,7 +2286,7 @@ static int PyHTPSSampleTactics_init(PyHTPSSampleTactics *self, PyObject *args, P
             Py_DECREF(iter);
             return -1;
         }
-        std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*(htps::lean_tactic*)item));
+        std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*(htps::tactic*)item));
         tactics.push_back(tac);
         Py_DECREF(item);
     }
@@ -2407,8 +2499,8 @@ static int PyProof_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "tactic must be a Tactic object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> proof_theorem = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::lean_theorem>(*(htps::lean_theorem*)py_thm));
-    std::shared_ptr<htps::tactic> proof_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::lean_tactic>(*(htps::lean_tactic*)py_tactic));
+    std::shared_ptr<htps::theorem> proof_theorem = std::static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>(*(htps::theorem*)py_thm));
+    std::shared_ptr<htps::tactic> proof_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*(htps::tactic*)py_tactic));
 
     std::vector<htps::proof> children;
     PyObject *iter = PyObject_GetIter(py_children);
@@ -2595,8 +2687,8 @@ static int PyHTPSResult_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "proof must be a Proof object");
         return -1;
     }
-    auto *goal = (htps::lean_theorem *) py_goal;
-    auto thm = static_cast<std::shared_ptr<htps::theorem>>(std::make_shared<htps::lean_theorem>(*goal));
+    auto *goal = (htps::theorem *) py_goal;
+    auto thm = static_cast<std::shared_ptr<htps::theorem>>(std::make_shared<htps::theorem>(*goal));
     auto *proof = (PyProof *) py_proof;
     result->cpp_obj.~HTPSResult();
     new (&result->cpp_obj) htps::HTPSResult(critic_samples, tactic_samples, effect_samples, metric, proof_samples_tactics, thm, proof->cpp_obj);
@@ -2969,13 +3061,13 @@ static int HTPS_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "theorem must be a Theorem object");
         return -1;
     }
-    auto *c_thm = (htps::lean_theorem *) thm;
+    auto *c_thm = (htps::theorem *) thm;
     if (!PyObject_TypeCheck(params, &ParamsType)) {
         PyErr_SetString(PyExc_TypeError, "params must be a SearchParams object");
         return -1;
     }
     auto *c_params = (htps::htps_params *) params;
-    auto shared_thm = (std::shared_ptr<htps::theorem>) std::make_shared<htps::lean_theorem>(*c_thm);
+    auto shared_thm = (std::shared_ptr<htps::theorem>) std::make_shared<htps::theorem>(*c_thm);
     tree->graph.set_root(shared_thm);
     tree->graph.set_params(*c_params);
     return 0;

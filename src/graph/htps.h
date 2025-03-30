@@ -237,10 +237,15 @@ namespace htps {
                   values(), solved(), virtual_count_added(), seen(), root(root), expansions(0) {
             theorems.insert(root, root);
             depth.insert(root, 0);
+            TheoremSet thm_set;
+            thm_set.insert(root);
+            seen.insert(root, thm_set);
             parent_for_theorem.insert(root, nullptr);
             children_for_theorem.insert(root, {});
             virtual_count_added.insert(root, false);
         }
+
+        Simulation() = default;
 
         void set_depth(const std::shared_ptr<theorem> &thm, size_t d);
 

@@ -10,6 +10,8 @@
 #include <optional>
 #include <unordered_set>
 #include <memory>
+#include <set>
+#include <any>
 
 namespace htps {
     struct tactic {
@@ -20,7 +22,9 @@ namespace htps {
         bool is_valid;
         size_t duration; // duration in milliseconds
 
-        virtual bool operator==(const tactic &t) const = 0;
+        bool operator==(const tactic &t) const;
+
+        ~tactic() = default;
     };
 }
 
@@ -42,6 +46,23 @@ namespace htps {
         bool operator==(const hypothesis &h) const;
     };
 
+    struct context {
+#ifdef PYTHON_BINDINGS
+        PyObject_HEAD
+#endif
+        std::set<std::string> namespaces{}; // we need a sorted set because the order should not influence tokenization
+
+        context() = default;
+
+        context(const context &) = default;
+
+        context(context &) = default;
+
+        context(context &&) = default;
+
+        explicit context(std::set<std::string> namespaces) : namespaces(std::move(namespaces)) {}
+    };
+
     struct theorem {
 #ifdef PYTHON_BINDINGS
         PyObject_HEAD
@@ -49,15 +70,29 @@ namespace htps {
         std::string conclusion;
         std::vector<hypothesis> hypotheses;
         std::string unique_string;
-
-        virtual bool operator==(const theorem &t) const = 0;
+        context ctx;
+        std::vector<tactic> past_tactics;
+        std::unordered_map<std::string, std::any> metadata;
 
         theorem() = default;
 
         theorem(const std::string &conclusion, const std::vector<hypothesis> &hypotheses) : conclusion(conclusion),
-                                                                                            hypotheses(hypotheses) {
+                                                                                            hypotheses(hypotheses),
+                                                                                            ctx(),
+                                                                                            past_tactics(),
+                                                                                            metadata() {
             unique_string = get_unique_string(conclusion, hypotheses);
         }
+
+        ~theorem() = default;
+
+        bool operator==(const theorem &t) const;
+
+        void set_context(const context& ctx);
+
+        void reset_tactics();
+
+        void set_tactics(std::vector<tactic> &tactics);
 
     protected:
         /* Create a unique string for a theorem using its conclusion and hypotheses.

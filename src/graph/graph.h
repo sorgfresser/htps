@@ -255,6 +255,7 @@ namespace htps {
                 return false;
             }
             killed_tactics.insert(i);
+            tactics[i]->is_valid = false;
             return all_tactics_killed();
         }
 

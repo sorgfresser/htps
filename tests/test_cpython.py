@@ -506,3 +506,47 @@ def test_metadata_garbage_collection():
     assert len(theorems) == 1
     assert theorems[0].metadata == {"proof_state_idx": 2}
     expansion = _create_expansion(theorems[0])
+
+def test_runtime_error():
+    context = Context([])
+    conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b'
+    root_thm = Theorem(conclusion, unique_string=conclusion, hypotheses=[], context=context, past_tactics=[])
+    root_thm.metadata = {"proof_state_idx": 0}
+    params = SearchParams(0.3, PolicyType.RPO, num_expansions=50, succ_expansions=3,
+                          early_stopping=True, no_critic=False, backup_once=False, backup_one_for_solved=True,
+                          depth_penalty=0.99, count_threshold=10, tactic_p_threshold=True,
+                          tactic_sample_q_conditioning=False, only_learn_best_tactics=False, tactic_init_value=0.0,
+                          q_value_solved=QValueSolved.One, policy_temperature=0.7, metric=Metric.Time,
+                          node_mask=NodeMask.NoMask, effect_subsampling_rate=1.0, critic_subsampling_rate=1.0,
+                          early_stopping_solved_if_root_not_proven=True, virtual_loss=0)
+    search = HTPS(root_thm, params)
+    theorems = search.theorems_to_expand()
+    assert len(theorems) == 1
+    _compare_theorem(theorems[0], root_thm)
+    assert theorems[0].metadata == {"proof_state_idx": 0}
+
+    # Expand
+    priors = [0.6993729472160339, 0.07791098207235336, 0.04969632253050804, 0.02888053096830845, 0.02696230262517929, 0.02652818337082863, 0.024863723665475845, 0.012412313371896744, 0.007620560005307198, 0.006644951645284891, 0.006566120311617851, 0.005705146584659815, 0.005507550202310085, 0.0054454258643090725, 0.0048826634883880615, 0.004638687241822481, 0.0037362780421972275, 0.002625199733301997]
+    tactic_strs = ['intro a b', 'intros a b', 'intro x y', 'intros', 'intro _ _', 'rintro _ _', 'convert hS', 'rintro a b', 'intro b b', 'clear hS', 'intros _ _', 'aesop', 'intro _ b', 'intros x y', 'have := hS', 'specialize hS', 'intro k b', 'intro a₁ b₁']
+    tactics = [Tactic(tactic_str, True, 0) for tactic_str in tactic_strs]
+    # children_for_tactic_conclusions = [['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\nx y : S\n⊢ x * (y * x) = y'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝ b✝ : S\n⊢ a✝ * (b✝ * a✝) = b✝'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝ b✝ : S\n⊢ a✝ * (b✝ * a✝) = b✝'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝ b✝ : S\n⊢ a✝ * (b✝ * a✝) = b✝'], ['case h.h.h.e\'_2.h.e\'_5\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝¹ a✝ : S\n⊢ a✝¹ = a✝¹ * a✝', 'case h.h.h.e\'_2.h.e\'_6\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝¹ a✝ : S\n⊢ a✝ * a✝¹ = a✝¹'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\nb✝ b : S\n⊢ b✝ * (b * b✝) = b'], ['S : Type u_1\ninst✝ : Mul S\n⊢ ∀ (a b : S), a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝ b✝ : S\n⊢ a✝ * (b✝ * a✝) = b✝'], ['S : Type u_1\ninst : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na✝ b : S\n⊢ a✝ * (b * a✝) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\nx y : S\n⊢ x * (y * x) = y'], ['S : Type u_1\ninst✝ : Mul S\nhS this : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\nk b : S\n⊢ k * (b * k) = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na₁ b₁ : S\n⊢ a₁ * (b₁ * a₁) = b₁']]
+    children_for_tactic_conclusions = [["a"], ["b"], ["c"], ["d"], ["e"], ["f"], ["g", "g2"], ["h"], ["i"], ["j"], ["k"], ["l"], ["m"], ["n"], ["o"], ["p"], ["q"], ["r"]]
+
+    children_for_tactic = [[Theorem(child, child, [], context, [tactic], metadata={"a": "b"}) for child in children] for tactic, children in zip(tactics, children_for_tactic_conclusions)]
+    effects = [EnvEffect(root_thm, tactic, children) for tactic, children in zip(tactics, children_for_tactic)]
+    times = [0 for _ in tactics]
+    expansion = EnvExpansion(root_thm, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
+    search.expand_and_backup([expansion])
+
+    theorems = search.theorems_to_expand()
+    # assert len(theorems) == 1
+    # _compare_theorem(theorems[0], children_for_tactic[0][0])
+
+    # Expand
+    priors = [0.3045986592769623, 0.2529015839099884, 0.1937999725341797, 0.1245618462562561, 0.12413795292377472]
+    tactic_strs = ['convert hS', 'have := hS a b', 'convert hS a b', 'convert hS a b using 1', 'specialize hS a b']
+    tactics = [Tactic(tactic_str, True, 0) for tactic_str in tactic_strs]
+    children_for_tactic_conclusions = [['case a\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b ↔ ∀ (a b : S), a * b * a = b'], ['S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\nthis : a * b * a = b\n⊢ a * (b * a) = b'], ['case h.e\'_2.h.e\'_5\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a = a * b', 'case h.e\'_2.h.e\'_6\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ b * a = a'], ['case h.e\'_2\nS : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = a * b * a'], ['S : Type u_1\ninst✝ : Mul S\na b : S\nhS : a * b * a = b\n⊢ a * (b * a) = b']]
+    children_for_tactic_past_tactic_strs = [[['intro a b', 'convert hS']], [['intro a b', 'have := hS a b']], [['intro a b', 'convert hS a b'], ['intro a b', 'convert hS a b']], [['intro a b', 'convert hS a b using 1']], [['intro a b', 'specialize hS a b']]]
+    past_tactics_children = [[[Tactic(children_str, True, 0) for children_str in children_strs] for children_strs in tactic_children_str] for tactic_children_str in children_for_tactic_past_tactic_strs]
+    children_for_tactic = [[Theorem(conclusion=conclusion, unique_string=conclusion, hypotheses=[], context=context, past_tactics=[Tactic(tactic_str, True, 0) for tactic_str in tactic_strs]) for tactic_strs, child in zip(children_tactic_strs, children)] for children_tactic_strs, children in zip(children_for_tactic_past_tactic_strs, children_for_tactic_conclusions)]

@@ -21,7 +21,7 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
                         const std::vector<size_t> &counts, std::vector<double> &result) const {
     size_t valid_count = 0;
     result.clear();
-    result.reserve(q_values.size());
+    result.insert(result.begin(), q_values.size(), 0);
     std::array<size_t, 2> valid_indices{0, 0};
     for (size_t i = 0; i < q_values.size(); i++) {
         if (q_values[i] > MIN_FLOAT) {
@@ -36,7 +36,6 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
         throw std::invalid_argument("No valid q-values");
     }
     if (valid_count == 1) {
-        std::fill(result.begin(), result.end(), 0);
         result[valid_indices[0]] = 1;
         return;
     }
@@ -56,18 +55,32 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
 void Policy::alpha_zero(const std::vector<double> &q_values, const std::vector<double> &pi_values,
                         const std::vector<size_t> &counts, std::vector<double> &result) const {
     std::vector<double> scores(q_values.size());
-    result.reserve(q_values.size());
     auto count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0)));
     std::vector<double> counts_d(counts.begin(), counts.end());
     double score_sum = 0;
+    size_t valid_count = 0;
     for (size_t i = 0; i < q_values.size(); i++) {
         if (pi_values[i] > MIN_FLOAT && q_values[i] > MIN_FLOAT) {
             scores[i] = q_values[i] + exploration * pi_values[i] * std::sqrt(count_sum) / (1 + counts_d[i]);
+            valid_count++;
         } else {
             scores[i] = 0;
         }
         score_sum += scores[i];
     }
+    assert (valid_count > 0);
+    // If score sum is 0, simply return the uniform distribution over valid actions
+    if (1e-10 > score_sum && score_sum > -1e-10) {
+        for (size_t i = 0; i < q_values.size(); i++) {
+            if (q_values[i] > MIN_FLOAT && pi_values[i] > MIN_FLOAT) {
+                result[i] = 1.0 / static_cast<double>(valid_count);
+            } else {
+                result[i] = 0;
+            }
+        }
+        return;
+    }
+    // Normalize the scores
     for (size_t i = 0; i < q_values.size(); i++) {
         result[i] = scores[i] / score_sum;
     }
@@ -104,7 +117,7 @@ double Policy::find_rpo_alpha(double alpha_min, double alpha_max, const std::vec
 
 void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<double> &pi_values,
                       const std::vector<size_t> &counts, std::vector<double> &result) const {
-    result.reserve(q_values.size());
+    result.insert(result.begin(), q_values.size(), 0);
     auto count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0)));
     double multiplier = std::sqrt(count_sum) / (count_sum + static_cast<double>(counts.size())) * exploration;
     if (multiplier <= 0) {

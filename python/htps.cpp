@@ -753,7 +753,7 @@ static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
     const char *unique_str = nullptr;
     const char *conclusion = nullptr;
     PyObject *context, *hypotheses, *past_tactics, *metadata;
-    metadata = nullptr;
+    metadata = NULL;
     static const char *kwlist[] = { "conclusion", "unique_string", "hypotheses", "context", "past_tactics", "metadata",NULL };
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssOOO|O", const_cast<char**>(kwlist), &conclusion, &unique_str, &hypotheses, &context, &past_tactics, &metadata))
         return -1;

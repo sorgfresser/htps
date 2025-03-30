@@ -1912,6 +1912,23 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 }
 
+static PyObject* EnvExpansion_get_jsonstr(PyObject *self, PyObject *args) {
+    auto *obj = (PyEnvExpansion *)self;
+    nlohmann::json j = obj->expansion.operator nlohmann::json();
+    return PyObject_from_string(j.dump());
+}
+
+static PyObject* EnvExpansion_from_jsonstr(PyTypeObject *type, PyObject *args) {
+    const char *json_str;
+    if (!PyArg_ParseTuple(args, "s", &json_str)) {
+        return NULL;
+    }
+    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto *self = (PyEnvExpansion *)EnvExpansion_new(type, NULL, NULL);
+    self->expansion = htps::env_expansion::from_json(j);
+    return (PyObject *)self;
+}
+
 static PyGetSetDef EnvExpansion_getsetters[] = {
     {"thm", (getter)EnvExpansion_get_thm, (setter)EnvExpansion_set_thm, "Theorem for expansion", NULL},
     {"expander_duration", (getter)EnvExpansion_get_expander_duration, (setter)EnvExpansion_set_expander_duration, "Expander duration", NULL},
@@ -1925,6 +1942,12 @@ static PyGetSetDef EnvExpansion_getsetters[] = {
     {"error", (getter)EnvExpansion_get_error, (setter)EnvExpansion_set_error, "Error string (optional)", NULL},
     {"is_error", (getter)EnvExpansion_get_is_error, NULL, "Returns True if error is set", NULL},
     {NULL}
+};
+
+static PyMethodDef EnvExpansion_methods[] = {
+    {"get_json_str", (PyCFunction)EnvExpansion_get_jsonstr, METH_NOARGS, "Get JSON string representation"},
+    {"from_json_str", (PyCFunction)EnvExpansion_from_jsonstr, METH_VARARGS | METH_CLASS, "Create from JSON string"},
+    {NULL, NULL, 0, NULL}
 };
 
 
@@ -1955,7 +1978,7 @@ NULL,
 NULL,
 NULL,
 NULL,
-NULL,
+EnvExpansion_methods,
 NULL,
 EnvExpansion_getsetters,
 NULL,

@@ -22,6 +22,26 @@ namespace htps {
         std::shared_ptr<theorem> goal;
         std::shared_ptr<tactic> tac;
         std::vector<std::shared_ptr<theorem>> children;
+
+        operator nlohmann::json() const {
+            nlohmann::json j;
+            j["goal"] = goal;
+            j["tac"] = tac;
+            j["children"] = children;
+            return j;
+        }
+
+        static env_effect from_json(const nlohmann::json &j) {
+            env_effect e;
+            e.goal = std::make_shared<theorem>(theorem::from_json(j["goal"]));
+            e.tac = std::make_shared<tactic>(tactic::from_json(j["tac"]));
+            std::vector<std::shared_ptr<theorem>> children;
+            for (const auto &child: j["children"]) {
+                children.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+            }
+            e.children = children;
+            return e;
+        }
     };
 
     struct env_expansion {
@@ -55,6 +75,71 @@ namespace htps {
                 env_durations(env_durations), effects(effects), log_critic(log_critic), tactics(tactics),
                 children_for_tactic(children_for_tactic), priors(priors) {}
 
+        operator nlohmann::json() const {
+            nlohmann::json j;
+            j["thm"] = thm;
+            j["expander_duration"] = expander_duration;
+            j["generation_duration"] = generation_duration;
+            j["env_durations"] = env_durations;
+            std::vector<nlohmann::json> effects_json;
+            for (const auto &effect: effects) {
+                effects_json.push_back(nlohmann::json(*effect));
+            }
+            j["effects"] = effects_json;
+            j["log_critic"] = log_critic;
+            std::vector<nlohmann::json> tactics_json;
+            for (const auto &tac: tactics) {
+                tactics_json.push_back(nlohmann::json(*tac));
+            }
+            j["tactics"] = tactics_json;
+            std::vector<std::vector<nlohmann::json>> children_for_tac;
+            for (const auto &children: children_for_tactic) {
+                std::vector<nlohmann::json> children_json;
+                for (const auto &child: children) {
+                    children_json.push_back(nlohmann::json(*child));
+                }
+                children_for_tac.push_back(children_json);
+            }
+            j["children_for_tactic"] = children_for_tac;
+            j["priors"] = priors;
+            if (error.has_value()) {
+                j["error"] = error.value();
+            }
+            return j;
+        }
+
+        static env_expansion from_json(const nlohmann::json &j) {
+            std::shared_ptr<theorem> thm = std::make_shared<theorem>(theorem::from_json(j["thm"]));
+            size_t expander_duration = j["expander_duration"];
+            size_t generation_duration = j["generation_duration"];
+            std::vector<size_t> env_durations = j["env_durations"];
+            if (j.contains("error")) {
+                std::string error = j["error"];
+                return env_expansion(thm, expander_duration, generation_duration, env_durations, error);
+            }
+
+            std::vector<std::shared_ptr<env_effect>> effects;
+            for (const auto &effect: j["effects"]) {
+                effects.push_back(std::make_shared<env_effect>(env_effect::from_json(effect)));
+            }
+            double log_critic = j["log_critic"];
+            std::vector<std::shared_ptr<tactic>> tactics;
+            for (const auto &tac: j["tactics"]) {
+                tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+            }
+            std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+            for (const auto &children: j["children_for_tactic"]) {
+                std::vector<std::shared_ptr<theorem>> children_json;
+                for (const auto &child: children) {
+                    children_json.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+                }
+                children_for_tactic.push_back(children_json);
+            }
+            std::vector<double> priors = j["priors"];
+
+            return {thm, expander_duration, generation_duration, env_durations, effects, log_critic,
+                                 tactics, children_for_tactic, priors};
+        }
     };
 }
 #endif //HTPS_CORE_H

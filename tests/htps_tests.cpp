@@ -16,10 +16,6 @@ public:
     DummyTheorem(const std::string &conclusion,
                  const std::vector<hypothesis> &hyps = {})
             : theorem(conclusion, hyps) {}
-
-    bool operator==(const theorem &t) const override {
-        return unique_string == t.unique_string;
-    }
 };
 
 class DummyTactic : public tactic {
@@ -28,10 +24,6 @@ public:
         unique_string = str;
         is_valid = valid;
         duration = dur;
-    }
-
-    bool operator==(const tactic &t) const override {
-        return unique_string == t.unique_string;
     }
 };
 

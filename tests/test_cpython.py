@@ -387,7 +387,10 @@ def test_htps_expansion():
     tactics = []
     theorem = Theorem("andb∧", "A", hypotheses, context, tactics)
     theorem2 = Theorem("andb∧d", "B", hypotheses, context, tactics)
+    theorem3 = Theorem("adb∧d", "C", hypotheses, context, tactics)
     theorem.metadata = {"key": "value"}
+    theorem2.metadata = {"key": "value2"}
+    theorem3.metadata = {"key": "value3"}
     params = SearchParams(0.3, PolicyType.RPO, 10, 3, True, True, True, True, 0.99, 10, True, True, True, 0.0, QValueSolved.One, 0.7, Metric.Time, NodeMask.NoMask, 1.0, 1.0, True, 1)
     search = HTPS(theorem, params)
 
@@ -402,10 +405,10 @@ def test_htps_expansion():
     tactic_a = Tactic("dummy_tactica", True, 1)
     tactic_b = Tactic("dummy_tacticb", True, 1)
     expansion_tactics = [tactic_a, tactic_b]
-    children_for_tactic = [[theorem2], [theorem2]]
+    children_for_tactic = [[theorem2], [theorem3]]
     priors = [0.5, 0.5]
-    effect1 = EnvEffect(theorem, tactic_b, [theorem2])
     effect2 = EnvEffect(theorem, tactic_a, [theorem2])
+    effect1 = EnvEffect(theorem, tactic_b, [theorem3])
     effects = [effect1, effect2]
     expansion = EnvExpansion(theorems[0], 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
     search.expand_and_backup([expansion])
@@ -413,6 +416,7 @@ def test_htps_expansion():
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
     _compare_theorem(theorems[0], theorem2)
+    assert theorems[0].metadata == {"key": "value2"}
 
     env_durations = [10]
     log_critic = -0.1
@@ -434,10 +438,71 @@ def test_htps_expansion():
     assert len(result.tactic_samples) == 2
     assert len(result.effect_samples) == 3 # 3 effects in total
     assert len(result.proof_samples_tactics) == 2
-    tactic_samples = [SampleTactics(theorem2, tactics=[tactic_a2], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=0), SampleTactics(theorem, tactics=[tactic_a, tactic_b], target_pi=[-1.0, -1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0, 1.0], visit_count=1)]
+    tactic_samples = [SampleTactics(theorem2, tactics=[tactic_a2], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=0), SampleTactics(theorem, tactics=[tactic_a], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=1)]
     _compare_critic_samples(result.critic_samples, [SampleCritic(theorem2, q_estimate=1.0, solved=True, bad=False, critic=0.0, visit_count=0), SampleCritic(theorem, q_estimate=1.0, solved=True, bad=False, critic=-0.5, visit_count=1)])
     _compare_tactic_samples(result.tactic_samples, tactic_samples)
-    _compare_effect_samples(result.effect_samples, [SampleEffect(theorem2, tactic_a2, []), SampleEffect(theorem, tactic_b, [theorem2]), SampleEffect(theorem, tactic_a, [theorem2])])
+    _compare_effect_samples(result.effect_samples, [SampleEffect(theorem2, tactic_a2, []), SampleEffect(theorem, tactic_b, [theorem3]), SampleEffect(theorem, tactic_a, [theorem2])])
     _compare_tactic_samples(result.proof_samples_tactics, tactic_samples)
     assert result.metric == Metric.Time
     _compare_theorem(result.goal, theorem)
+
+
+def _create_expansion(theorem):
+    priors = [0.7, 0.3]
+    tactic_a = Tactic('intro a b', True, 0)
+    tactic_b = Tactic('intro b a', True, 0)
+    tactics = [tactic_a, tactic_b]
+    child_conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'
+    child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    child_thm.metadata = {"proof_state_idx": 1}
+    child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    effects = [EnvEffect(theorem, tactic_a, [child_thm]), EnvEffect(theorem, tactic_b, [child_thm2])]
+    times = [0, 0]
+    children_for_tactic = [[child_thm], [child_thm2]]
+    expansion = EnvExpansion(theorem, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
+    return expansion
+
+def _create_expansion2(theorem):
+    priors = [0.7, 0.3]
+    tactic_a = Tactic('intro a b', True, 0)
+    tactic_b = Tactic('intro b a', True, 0)
+    tactics = [tactic_a, tactic_b]
+    child_conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c'
+    child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    child_thm.metadata = {"proof_state_idx": 2}
+    child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    effects = [EnvEffect(theorem, tactic_a, [child_thm]), EnvEffect(theorem, tactic_b, [child_thm2])]
+    times = [0, 0]
+    children_for_tactic = [[child_thm], [child_thm2]]
+    expansion = EnvExpansion(theorem, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
+    return expansion
+
+
+def test_metadata_garbage_collection():
+    context = Context([])
+    conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b'
+    root_thm = Theorem(conclusion, unique_string=conclusion, hypotheses=[], context=context, past_tactics=[])
+    root_thm.metadata = {"proof_state_idx": 0}
+    params = SearchParams(0.3, PolicyType.RPO, num_expansions=50, succ_expansions=3,
+                          early_stopping=True, no_critic=False, backup_once=False, backup_one_for_solved=True,
+                          depth_penalty=0.99, count_threshold=10, tactic_p_threshold=True,
+                          tactic_sample_q_conditioning=False, only_learn_best_tactics=False, tactic_init_value=0.0,
+                          q_value_solved=QValueSolved.One, policy_temperature=0.7, metric=Metric.Time,
+                          node_mask=NodeMask.NoMask, effect_subsampling_rate=1.0, critic_subsampling_rate=1.0,
+                          early_stopping_solved_if_root_not_proven=True, virtual_loss=0)
+    search = HTPS(root_thm, params)
+    theorems = search.theorems_to_expand()
+    assert len(theorems) == 1
+    _compare_theorem(theorems[0], root_thm)
+    assert theorems[0].metadata == {"proof_state_idx": 0}
+    expansion = _create_expansion(theorems[0])
+    search.expand_and_backup([expansion])
+    theorems = search.theorems_to_expand()
+    assert len(theorems) == 1
+    assert theorems[0].metadata == {"proof_state_idx": 1}
+    expansion = _create_expansion2(theorems[0])
+    search.expand_and_backup([expansion])
+    theorems = search.theorems_to_expand()
+    assert len(theorems) == 1
+    assert theorems[0].metadata == {"proof_state_idx": 2}
+    expansion = _create_expansion(theorems[0])

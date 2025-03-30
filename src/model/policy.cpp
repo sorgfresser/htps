@@ -155,3 +155,16 @@ void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<dou
         result[i] /= result_sum;
     }
 }
+
+Policy Policy::from_json(const nlohmann::json &j) {
+    PolicyType type = static_cast<PolicyType>(j["type"]);
+    double exploration = j["exploration"];
+    return Policy(type, exploration);
+}
+
+Policy::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["type"] = type;
+    j["exploration"] = exploration;
+    return j;
+}

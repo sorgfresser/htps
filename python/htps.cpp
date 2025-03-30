@@ -3166,6 +3166,37 @@ static PyObject* PyHTPS_get_result(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
     return PyHTPSResult_NewFromResult(result);
 }
 
+static PyObject* PyHTPS_get_jsonstr(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    std::string result;
+    try {
+        result = nlohmann::json(self->graph).dump();
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+    return PyObject_from_string(result);
+}
+
+static PyObject* PyHTPS_from_jsonstr(PyTypeObject *type, PyObject *args) {
+    const char *json_str;
+    if (!PyArg_ParseTuple(args, "s", &json_str)) {
+        PyErr_SetString(PyExc_TypeError, "from_jsonstr expects a string");
+        return NULL;
+    }
+    try {
+        auto json = nlohmann::json::parse(json_str);
+        auto graph = htps::HTPS::from_json(json);
+        PyObject *obj = HTPS_new(type, NULL, NULL);
+        if (obj == NULL)
+            return NULL;
+        auto *py_graph = (PyHTPS *) obj;
+        py_graph->graph = graph;
+        return obj;
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+}
 
 static PyMethodDef HTPS_methods[] = {
     {"theorems_to_expand", (PyCFunction)PyHTPS_theorems_to_expand, METH_NOARGS, "Returns a list of subsequent theorems to expand"},
@@ -3173,6 +3204,8 @@ static PyMethodDef HTPS_methods[] = {
     {"proven", (PyCFunction)PyHTPS_is_proven, METH_NOARGS, "Whether the start theorem is proven or not"},
     {"get_result", (PyCFunction)PyHTPS_get_result, METH_NOARGS, "Returns the result of the HTPS run"},
     {"is_done", (PyCFunction)PyHTPS_is_done, METH_NOARGS, "Whether the HTPS run is done or not"},
+    {"get_json_str", (PyCFunction)PyHTPS_get_jsonstr, METH_NOARGS, "Returns a JSON string representation of the HTPS object"},
+    {"from_json_str", (PyCFunction)PyHTPS_from_jsonstr, METH_VARARGS | METH_CLASS, "Creates a HTPS object from a JSON string"},
     {NULL, NULL, 0, NULL}
 };
 

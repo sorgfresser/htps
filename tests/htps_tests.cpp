@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
 #include "../src/graph/htps.h"
 
 using namespace htps;
@@ -549,10 +550,33 @@ TEST_F(HTPSTest, TestCountThreshold) {
 }
 
 
+nlohmann::json load_json_from_file(const std::string &filename) {
+    std::ifstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    nlohmann::json j = nlohmann::json::parse(file);
+    return j;
+}
+
+void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    // Dump JSON object to the file with an indent of 4 spaces.
+    file << j.dump(4);
+
+    if (!file.good()) {
+        throw std::runtime_error("Error writing to file: " + filename);
+    }
+}
+
+
 TEST_F(HTPSTest, TestInfiniteLoop) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
-
     EXPECT_FALSE(htps_instance->is_proven());
 
     htps_instance->theorems_to_expand();
@@ -614,4 +638,21 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     EXPECT_TRUE(samples_effect.size() == 3);
     // No proof samples though, as there is no proof
     EXPECT_TRUE(proof_samples_tactics.empty());
+
+    auto json = nlohmann::json(*htps_instance);
+    dump_json_to_file(json, "samples/test2.json");
+}
+
+
+
+TEST_F(HTPSTest, TestJsonLoading) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+
+    auto j = load_json_from_file("samples/test.json");
+
+    HTPS search = htps::HTPS::from_json(j);
+    EXPECT_FALSE(search.is_done());
+    // Because we are awaiting expansions
+    EXPECT_THROW(search.theorems_to_expand(), std::runtime_error);
 }

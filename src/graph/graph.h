@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <array>
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <limits>
 #include <optional>
@@ -60,6 +61,22 @@ namespace htps {
         }
 
         MinimumLengthMap() : minimum_length{MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH} {}
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            j["DEPTH"] = minimum_length[DEPTH];
+            j["SIZE"] = minimum_length[SIZE];
+            j["TIME"] = minimum_length[TIME];
+            return j;
+        }
+
+        static MinimumLengthMap from_json(const nlohmann::json &j) {
+            MinimumLengthMap m;
+            m.set(DEPTH, j["DEPTH"]);
+            m.set(SIZE, j["SIZE"]);
+            m.set(TIME, j["TIME"]);
+            return m;
+        }
     };
 
     class MinimumTacticMap {
@@ -93,6 +110,22 @@ namespace htps {
         }
 
         MinimumTacticMap() : minimum_tactics{std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>()} {}
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            j["DEPTH"] = minimum_tactics[DEPTH];
+            j["SIZE"] = minimum_tactics[SIZE];
+            j["TIME"] = minimum_tactics[TIME];
+            return j;
+        }
+
+        static MinimumTacticMap from_json(const nlohmann::json &j) {
+            MinimumTacticMap m;
+            for (size_t t: j["DEPTH"]) m.add_tactic(DEPTH, t);
+            for (size_t t: j["SIZE"]) m.add_tactic(SIZE, t);
+            for (size_t t: j["TIME"]) m.add_tactic(TIME, t);
+            return m;
+        }
     };
 
     class MinimumTacticLengthMap {
@@ -136,6 +169,22 @@ namespace htps {
             std::cout << '\n';
         }
 
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            j["DEPTH"] = minimum_tactic_length[DEPTH];
+            j["SIZE"] = minimum_tactic_length[SIZE];
+            j["TIME"] = minimum_tactic_length[TIME];
+            return j;
+        }
+
+        static MinimumTacticLengthMap from_json(const nlohmann::json &j) {
+            MinimumTacticLengthMap m;
+            for (size_t i = 0; i < j["DEPTH"].size(); i++) m.set_tactic(DEPTH, j["DEPTH"][i], i);
+            for (size_t i = 0; i < j["SIZE"].size(); i++) m.set_tactic(SIZE, j["SIZE"][i], i);
+            for (size_t i = 0; i < j["TIME"].size(); i++) m.set_tactic(TIME, j["TIME"][i], i);
+            return m;
+        }
+
     };
 
     class MinimumBoolMap {
@@ -157,6 +206,22 @@ namespace htps {
         }
 
         MinimumBoolMap() : minimum_bool{false, false, false} {}
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            j["DEPTH"] = minimum_bool[DEPTH];
+            j["SIZE"] = minimum_bool[SIZE];
+            j["TIME"] = minimum_bool[TIME];
+            return j;
+        }
+
+        static MinimumBoolMap from_json(const nlohmann::json &j) {
+            MinimumBoolMap m;
+            m.set(DEPTH, j["DEPTH"]);
+            m.set(SIZE, j["SIZE"]);
+            m.set(TIME, j["TIME"]);
+            return m;
+        }
     };
 
     class Node {
@@ -405,6 +470,66 @@ namespace htps {
         bool is_in_minimum_proof(Metric metric) const {
             return in_minimum_proof.get(metric);
         }
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            j["theorem"] = *thm;
+            std::vector<nlohmann::json> tactic_json;
+            for (const auto &tac: tactics) {
+                tactic_json.push_back(*tac);
+            }
+            j["tactics"] = tactic_json;
+            std::vector<std::vector<nlohmann::json>> children_for_tactic_json;
+            for (const auto &children: children_for_tactic) {
+                std::vector<nlohmann::json> children_json;
+                for (const auto &child: children) {
+                    children_json.push_back(*child);
+                }
+                children_for_tactic_json.push_back(children_json);
+            }
+            j["children_for_tactic"] = children_for_tactic_json;
+            j["killed_tactics"] = killed_tactics;
+            j["solving_tactics"] = solving_tactics;
+            j["tactic_expandable"] = tactic_expandable;
+            j["minimum_proof_size"] = nlohmann::json(minimum_proof_size);
+            j["minimum_tactics"] = nlohmann::json(minimum_tactics);
+            j["minimum_tactic_length"] = nlohmann::json(minimum_tactic_length);
+            j["in_minimum_proof"] = nlohmann::json(in_minimum_proof);
+            j["solved"] = solved;
+            j["is_solved_leaf"] = is_solved_leaf;
+            j["in_proof"] = in_proof;
+            return j;
+        }
+
+        static Node from_json(const nlohmann::json &j) {
+            Node n;
+            n.thm = std::make_shared<theorem>(theorem::from_json(j["theorem"]));
+            std::vector<std::shared_ptr<tactic>> tactics;
+            for (const auto &tac: j["tactics"]) {
+                tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+            }
+            n.tactics = tactics;
+            std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+            for (const auto &children: j["children_for_tactic"]) {
+                std::vector<std::shared_ptr<theorem>> children_for_tactic_inner;
+                for (const auto &child: children) {
+                    children_for_tactic_inner.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+                }
+                children_for_tactic.push_back(children_for_tactic_inner);
+            }
+            n.children_for_tactic = children_for_tactic;
+            n.killed_tactics = j["killed_tactics"].get<std::unordered_set<size_t>>();
+            n.solving_tactics = j["solving_tactics"].get<std::unordered_set<size_t>>();
+            n.tactic_expandable = j["tactic_expandable"].get<std::vector<bool>>();
+            n.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
+            n.minimum_tactics = MinimumTacticMap::from_json(j["minimum_tactics"]);
+            n.minimum_tactic_length = MinimumTacticLengthMap::from_json(j["minimum_tactic_length"]);
+            n.in_minimum_proof = MinimumBoolMap::from_json(j["in_minimum_proof"]);
+            n.solved = j["solved"];
+            n.is_solved_leaf = j["is_solved_leaf"];
+            n.in_proof = j["in_proof"];
+            return n;
+        }
     };
 }
 
@@ -425,7 +550,7 @@ namespace htps {
         size_t priority;
         size_t tactic_id;
 
-        PrioritizedNode(std::shared_ptr<Node> node, size_t priority, size_t tactic_id) : node(node), priority(priority),
+        PrioritizedNode(std::shared_ptr<Node> node, size_t priority, size_t tactic_id) : node(std::move(node)), priority(priority),
                                                                          tactic_id(tactic_id) {}
 
         bool operator<(const PrioritizedNode &other) const {
@@ -513,6 +638,22 @@ namespace htps {
         auto empty() const {
             return _set.empty();
         }
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            for (const auto &s : _set) {
+                j.push_back(s);
+            }
+            return j;
+        }
+
+        static TheoremSet from_json(const nlohmann::json &j) {
+            TheoremSet set;
+            for (const auto &s : j) {
+                set.insert(static_cast<std::string>(s));
+            }
+            return set;
+        }
     };
 
     struct PairHash {
@@ -599,6 +740,22 @@ namespace htps {
 
         auto empty() const {
             return _set.empty();
+        }
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            for (const auto &[key, value] : _set) {
+                j[key] = value;
+            }
+            return j;
+        }
+
+        static TheoremPairSet<T> from_json(const nlohmann::json &j) {
+            TheoremPairSet<T> set;
+            for (const auto &[key, value] : j.items()) {
+                set.insert(key, value);
+            }
+            return set;
         }
     };
 
@@ -729,6 +886,22 @@ namespace htps {
         bool empty() const noexcept {
             return _map.empty();
         }
+
+        static TheoremMap<T> from_json(const nlohmann::json &j) {
+            TheoremMap<T> map;
+            for (const auto &[key, value]: j.items()) {
+                map.insert(key, value);
+            }
+            return map;
+        }
+
+        explicit operator nlohmann::json() const {
+            nlohmann::json j;
+            for (const auto &[key, value]: _map) {
+                j[key] = value;
+            }
+            return j;
+        }
     };
 
 
@@ -830,6 +1003,14 @@ namespace htps {
         bool erase(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
             return erase(*thm, parent, tactic_id);
         }
+
+        static AncestorsMap from_json(const nlohmann::json &j) {
+            AncestorsMap m;
+            for (const auto &[key, value]: j.items()) {
+                m.insert(key, AncestorSet::from_json(value));
+            }
+            return m;
+        }
     };
 
     // Nodes of type T, prioritized nodes of type PT
@@ -854,6 +1035,30 @@ namespace htps {
         }
 
         Graph() = default;
+
+        operator nlohmann::json() const {
+            nlohmann::json j;
+            j["root"] = *root;
+            j["nodes"] = nlohmann::json(nodes);
+            j["ancestors"] = nlohmann::json(ancestors);
+            j["permanent_ancestors"] = nlohmann::json(permanent_ancestors);
+            j["unexplored_theorems"] = nlohmann::json(unexplored_theorems);
+            j["minimum_proof_size"] = nlohmann::json(minimum_proof_size);
+            j["initial_minimum_proof_size"] = nlohmann::json(initial_minimum_proof_size);
+            return j;
+        }
+
+        static Graph from_json(const nlohmann::json &j) {
+            Graph g;
+            g.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
+            g.nodes = TheoremMap<std::shared_ptr<T>>::from_json(j["nodes"]);
+            g.ancestors = AncestorsMap::from_json(j["ancestors"]);
+            g.permanent_ancestors = AncestorsMap::from_json(j["permanent_ancestors"]);
+            g.unexplored_theorems = TheoremSet::from_json(j["unexplored_theorems"]);
+            g.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
+            g.initial_minimum_proof_size = MinimumLengthMap::from_json(j["initial_minimum_proof_size"]);
+            return g;
+        }
 
         void reset_minimum_proof_stats() {
             minimum_proof_size = initial_minimum_proof_size;

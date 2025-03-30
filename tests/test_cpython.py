@@ -506,6 +506,8 @@ def test_metadata_garbage_collection():
     assert len(theorems) == 1
     assert theorems[0].metadata == {"proof_state_idx": 2}
     expansion = _create_expansion(theorems[0])
+    with open("test.json", "w") as file:
+        file.write(search.get_json_str())
 
 def test_runtime_error():
     context = Context([])

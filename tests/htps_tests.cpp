@@ -649,9 +649,6 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
 
 
 TEST_F(HTPSTest, TestJsonLoading) {
-    auto params = dummyParams;
-    htps_instance->set_params(dummyParams);
-
     auto j = load_json_from_file("samples/test.json");
 
     HTPS search = htps::HTPS::from_json(j);

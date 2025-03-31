@@ -1263,6 +1263,7 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
     htps.currently_expanding = TheoremSet::from_json(j["currently_expanding"]);
     htps.propagate_needed = j["propagate_needed"];
     htps.done = j["done"];
+    htps::seed = j["seed"];
     return htps;
 }
 
@@ -1308,6 +1309,7 @@ HTPS::operator nlohmann::json() const {
     j["currently_expanding"] = nlohmann::json(currently_expanding);
     j["propagate_needed"] = propagate_needed;
     j["done"] = done;
+    j["seed"] = htps::seed;
     return j;
 }
 

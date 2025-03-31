@@ -1056,6 +1056,9 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
             updated_root = true;
             continue;
         }
+        if (!children_propagated.contains(sim->parent(cur))) {
+            children_propagated.insert_or_assign(sim->parent(cur), 0);
+        }
         children_propagated.at(sim->parent(cur)) += 1;
         if (children_propagated.at(sim->parent(cur)) == sim->get_children(sim->parent(cur)).size()) {
             to_process.push(sim->parent(cur));

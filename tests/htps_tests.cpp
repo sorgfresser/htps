@@ -659,3 +659,25 @@ TEST_F(HTPSTest, TestJsonLoading) {
     // Because we are awaiting expansions
     EXPECT_THROW(search.theorems_to_expand(), std::runtime_error);
 }
+
+
+
+TEST_F(HTPSTest, TestJsonExpectations) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+
+    auto j = load_json_from_file("samples/search.json");
+
+    HTPS search = htps::HTPS::from_json(j);
+    EXPECT_FALSE(search.is_done());
+
+    for (size_t index = 0; index < 3; index++) {
+        j = load_json_from_file("samples/expansions_" + std::to_string(index) + ".json");
+        std::vector<std::shared_ptr<htps::env_expansion>> expansions;
+        for (auto &expansion: j) {
+            expansions.push_back(std::make_shared<htps::env_expansion>(htps::env_expansion::from_json(expansion)));
+        }
+        auto theorems = search.theorems_to_expand();
+        search.expand_and_backup(expansions);
+    }
+}

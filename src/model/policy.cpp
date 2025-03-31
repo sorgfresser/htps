@@ -49,6 +49,11 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
         default:
             throw std::invalid_argument("Invalid policy type");
     }
+    bool is_nan = std::any_of(result.begin(), result.end(), [](double d) { return std::isnan(d); });
+    assert (!is_nan);
+    assert (q_values.size() == result.size());
+    double sum = std::accumulate(result.begin(), result.end(), 0.0);
+    assert (sum > 0.99 && sum < 1.01);
 }
 
 
@@ -117,19 +122,33 @@ double Policy::find_rpo_alpha(double alpha_min, double alpha_max, const std::vec
 
 void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<double> &pi_values,
                       const std::vector<size_t> &counts, std::vector<double> &result) const {
-    result.insert(result.begin(), q_values.size(), 0);
     auto count_sum = static_cast<double>(std::accumulate(counts.begin(), counts.end(), static_cast<size_t>(0)));
     double multiplier = std::sqrt(count_sum) / (count_sum + static_cast<double>(counts.size())) * exploration;
     if (multiplier <= 0) {
+        size_t valid_count = 0;
         double q_sum = 0;
         for (size_t i = 0; i < q_values.size(); i++) {
             if (q_values[i] > MIN_FLOAT) {
                 result[i] = q_values[i];
                 q_sum += q_values[i];
+                valid_count++;
             } else {
                 result[i] = 0;
             }
         }
+        // If q sum is 0, simply return the uniform distribution over valid actions
+        assert (valid_count > 0);
+        if (1e-10 > q_sum && q_sum > -1e-10) {
+            for (size_t i = 0; i < q_values.size(); i++) {
+                if (q_values[i] > MIN_FLOAT && pi_values[i] > MIN_FLOAT) {
+                    result[i] = 1.0 / static_cast<double>(valid_count);
+                } else {
+                    result[i] = 0;
+                }
+            }
+            return;
+        }
+
         for (size_t i = 0; i < q_values.size(); i++) {
             result[i] /= q_sum;
         }

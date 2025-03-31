@@ -852,11 +852,10 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         if (params.policy_temperature == 0) {
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
         } else {
-            // Normal softmax, but with the logarithmic policy. I.e. exp(log(p)/temperature), which cancels out
-            // So instead, we compute p^(1/temperature) directly
+            // Normal softmax with temperature, i.e. exp(p / temperature)
             double p_sum = 0;
             for (auto &p: node_policy) {
-                p = std::pow(p, 1.0 / params.policy_temperature);
+                p = std::exp(p / params.policy_temperature);
                 p_sum += p;
             }
             for (auto &p: node_policy) {

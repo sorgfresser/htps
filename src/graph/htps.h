@@ -605,6 +605,8 @@ namespace htps {
         static HTPS from_json(const nlohmann::json &j);
 
         explicit operator nlohmann::json() const;
+
+        htps::htps_params get_params() const;
     };
 
 }

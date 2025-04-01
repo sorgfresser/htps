@@ -17,13 +17,16 @@ size_t htps::get_seed() {
     std::random_device rd;
     size_t s = std::getenv("SEED") ? std::stoi(std::getenv("SEED")) : rd();
 #ifdef VERBOSE_PRINTS
-    printf("Seed: %i", seed);
+    printf("Seed: %i", s);
 #endif
     return s;
 }
 
 std::mt19937 htps::setup_gen() {
     std::random_device rd;
+#ifdef VERBOSE_PRINTS
+    printf("Seed: %i", htps::seed);
+#endif
     return std::mt19937(htps::seed);
 }
 
@@ -849,6 +852,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         // Select subsequent tactic
         HTPS_node->compute_policy(node_policy, true);
         size_t tactic_id;
+        printf("%lf", params.policy_temperature);
         if (params.policy_temperature == 0) {
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
         } else {
@@ -861,6 +865,12 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             for (auto &p: node_policy) {
                 p = p / p_sum;
             }
+#ifdef VERBOSE_PRINTS
+            for (auto &p: node_policy) {
+                printf("%lf ", p);
+            }
+            printf("\n");
+#endif
             std::discrete_distribution<size_t> dist(node_policy.begin(), node_policy.end());
             tactic_id = dist(gen);
         }
@@ -1264,6 +1274,7 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
     htps.propagate_needed = j["propagate_needed"];
     htps.done = j["done"];
     htps::seed = j["seed"];
+    htps::gen = setup_gen();
     return htps;
 }
 
@@ -1311,6 +1322,10 @@ HTPS::operator nlohmann::json() const {
     j["done"] = done;
     j["seed"] = htps::seed;
     return j;
+}
+
+htps::htps_params HTPS::get_params() const {
+    return params;
 }
 
 

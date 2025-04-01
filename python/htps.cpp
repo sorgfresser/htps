@@ -45,47 +45,42 @@ static PyObject *make_enum(PyObject *module, PyObject *enum_module, const char *
 static PyObject *make_policy_type(PyObject *module, PyObject *enum_module) {
     if (PolicyTypeEnum != NULL)
         return PolicyTypeEnum;
-    size_t value_size = 2;
-    const char *values[value_size] = {"AlphaZero", "RPO"};
-    PolicyTypeEnum = make_enum(module, enum_module, values, value_size, "PolicyType");
+    const char *values[] = {"AlphaZero", "RPO"};
+    PolicyTypeEnum = make_enum(module, enum_module, values, 2, "PolicyType");
     return PolicyTypeEnum;
 }
 
 static PyObject *make_q_value_solved(PyObject *module, PyObject *enum_module) {
     if (QValueSolvedEnum != NULL)
         return QValueSolvedEnum;
-    size_t value_size = 5;
-    const char *values[value_size] = {
+    const char *values[] = {
         "OneOverCounts", "CountOverCounts", "One", "OneOverVirtualCounts", "OneOverCountsNoFPU", "CountOverCountsNoFPU"
     };
-    QValueSolvedEnum = make_enum(module, enum_module, values, value_size, "QValueSolved");
+    QValueSolvedEnum = make_enum(module, enum_module, values, 6, "QValueSolved");
     return QValueSolvedEnum;
 }
 
 static PyObject *make_node_mask(PyObject *module, PyObject *enum_module) {
     if (NodeMaskEnum != NULL)
         return NodeMaskEnum;
-    size_t value_size = 5;
-    const char *values[value_size] = {"NoMask", "Solving", "Proof", "MinimalProof", "MinimalProofSolving"};
-    NodeMaskEnum =  make_enum(module, enum_module, values, value_size, "NodeMask");
+    const char *values[5] = {"NoMask", "Solving", "Proof", "MinimalProof", "MinimalProofSolving"};
+    NodeMaskEnum =  make_enum(module, enum_module, values, 5, "NodeMask");
     return NodeMaskEnum;
 }
 
 static PyObject *make_metric(PyObject *module, PyObject *enum_module) {
     if (MetricEnum != NULL)
         return MetricEnum;
-    size_t value_size = 3;
-    const char *values[value_size] = {"Depth", "Size", "Time"};
-    MetricEnum = make_enum(module, enum_module, values, value_size, "Metric");
+    const char *values[3] = {"Depth", "Size", "Time"};
+    MetricEnum = make_enum(module, enum_module, values, 3, "Metric");
     return MetricEnum;
 }
 
 static PyObject *make_in_proof(PyObject *module, PyObject *enum_module) {
     if (InProofEnum != NULL)
         return InProofEnum;
-    size_t value_size = 3;
-    const char *values[value_size] = {"NotInProof", "InProof", "InMinimalProof"};
-    InProofEnum = make_enum(module, enum_module, values, value_size, "InProof");
+    const char *values[3] = {"NotInProof", "InProof", "InMinimalProof"};
+    InProofEnum = make_enum(module, enum_module, values, 3, "InProof");
     return InProofEnum;
 }
 
@@ -1847,7 +1842,12 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 PyErr_SetString(PyExc_ValueError, "priors must sum to 1");
                 return -1;
             }
-
+            std::vector<size_t> sizes = {env_durations.size(), effects.size(), tactics.size(), children_for_tactic.size()};
+            bool are_same = std::all_of(sizes.begin(), sizes.end(), [priors](size_t value) {return priors.size() == value;});
+            if (!are_same) {
+                PyErr_SetString(PyExc_ValueError, "Priors, tactics, Durations, Effects and Children for Tactic must be of the same size!");
+                return NULL;
+            }
 
             new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(
                 shared_thm, expander_duration, generation_duration, env_durations,

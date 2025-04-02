@@ -8,6 +8,7 @@
 #include <vector>
 #include <cassert>
 #include <limits>
+#include "../json.hpp"
 
 namespace htps {
     constexpr double MIN_FLOAT = -std::numeric_limits<double>::infinity(); // Avoid underflow, use float min
@@ -35,6 +36,10 @@ namespace htps {
         Policy(PolicyType type, double exploration) : type(type), exploration(exploration) {
             assert(type != PolicyTypeCount);
         }
+
+        static Policy from_json(const nlohmann::json &j);
+
+        explicit operator nlohmann::json() const;
 
     protected:
         void alpha_zero(const std::vector<double> &q_values, const std::vector<double> &pi_values,

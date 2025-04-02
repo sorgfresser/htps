@@ -1846,7 +1846,7 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             bool are_same = std::all_of(sizes.begin(), sizes.end(), [priors](size_t value) {return priors.size() == value;});
             if (!are_same) {
                 PyErr_SetString(PyExc_ValueError, "Priors, tactics, Durations, Effects and Children for Tactic must be of the same size!");
-                return NULL;
+                return -1;
             }
 
             new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(

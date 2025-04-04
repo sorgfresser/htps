@@ -52,7 +52,11 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
     bool is_nan = std::any_of(result.begin(), result.end(), [](double d) { return std::isnan(d); });
     assert (!is_nan);
     assert (q_values.size() == result.size());
-    double sum = std::accumulate(result.begin(), result.end(), 0.0);
+    double sum = 0.0;
+    for (size_t i = 0; i < result.size(); i++) {
+        if (result[i] > MIN_FLOAT)
+            sum += result[i];
+    }
     assert (sum > 0.99 && sum < 1.01);
 }
 
@@ -68,10 +72,10 @@ void Policy::alpha_zero(const std::vector<double> &q_values, const std::vector<d
         if (pi_values[i] > MIN_FLOAT && q_values[i] > MIN_FLOAT) {
             scores[i] = q_values[i] + exploration * pi_values[i] * std::sqrt(count_sum) / (1 + counts_d[i]);
             valid_count++;
+            score_sum += scores[i];
         } else {
-            scores[i] = 0;
+            scores[i] = MIN_FLOAT;
         }
-        score_sum += scores[i];
     }
     assert (valid_count > 0);
     // If score sum is 0, simply return the uniform distribution over valid actions
@@ -80,14 +84,17 @@ void Policy::alpha_zero(const std::vector<double> &q_values, const std::vector<d
             if (q_values[i] > MIN_FLOAT && pi_values[i] > MIN_FLOAT) {
                 result[i] = 1.0 / static_cast<double>(valid_count);
             } else {
-                result[i] = 0;
+                result[i] = MIN_FLOAT;
             }
         }
         return;
     }
     // Normalize the scores
     for (size_t i = 0; i < q_values.size(); i++) {
-        result[i] = scores[i] / score_sum;
+        if (scores[i] > MIN_FLOAT)
+            result[i] = scores[i] / score_sum;
+        else
+            result[i] = MIN_FLOAT;
     }
 }
 
@@ -133,7 +140,7 @@ void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<dou
                 q_sum += q_values[i];
                 valid_count++;
             } else {
-                result[i] = 0;
+                result[i] = MIN_FLOAT;
             }
         }
         // If q sum is 0, simply return the uniform distribution over valid actions
@@ -143,14 +150,18 @@ void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<dou
                 if (q_values[i] > MIN_FLOAT && pi_values[i] > MIN_FLOAT) {
                     result[i] = 1.0 / static_cast<double>(valid_count);
                 } else {
-                    result[i] = 0;
+                    result[i] = MIN_FLOAT;
                 }
             }
             return;
         }
 
         for (size_t i = 0; i < q_values.size(); i++) {
-            result[i] /= q_sum;
+            if (q_values[i] > MIN_FLOAT) {
+                result[i] = result[i] / q_sum;
+            } else {
+                result[i] = MIN_FLOAT;
+            }
         }
         return;
     }

@@ -941,7 +941,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
                        [this](const auto &thm) { return !this->nodes.contains(thm); }));
     assert(sim.leave_count() == all_leaves.size());
     for (const auto &thm: all_leaves) {
-#ifdef VERBOSE_PRINT
+#ifdef VERBOSE_PRINTS
         printf("Erasing theorem set\n");
 #endif
         sim.erase_theorem_set(thm);

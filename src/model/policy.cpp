@@ -36,6 +36,7 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
         throw std::invalid_argument("No valid q-values");
     }
     if (valid_count == 1) {
+        std::fill(result.begin(), result.end(), MIN_FLOAT);
         result[valid_indices[0]] = 1;
         return;
     }
@@ -178,11 +179,19 @@ void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<dou
     double alpha = find_rpo_alpha(alpha_min, alpha_max, q_values, scaled_pi_values);
     double result_sum = 0;
     for (size_t i = 0; i < q_values.size(); i++) {
-        result[i] = scaled_pi_values[i] / std::max((alpha - q_values[i]), EPSILON);
-        result_sum += result[i];
+        if (q_values[i] > MIN_FLOAT) {
+            result[i] = scaled_pi_values[i] / std::max((alpha - q_values[i]), EPSILON);
+            result_sum += result[i];
+        }
+        else {
+            result[i] = MIN_FLOAT;
+        }
     }
     for (size_t i = 0; i < q_values.size(); i++) {
-        result[i] /= result_sum;
+        if (result[i] > MIN_FLOAT)
+            result[i] = result[i] / result_sum;
+        else
+            result[i] = MIN_FLOAT;
     }
 }
 

@@ -330,6 +330,34 @@ Simulation Simulation::from_json(const nlohmann::json &j) {
     return s;
 }
 
+void Simulation::deduplicate(const std::shared_ptr<theorem> &ptr) {
+    auto it = theorems.find(ptr);
+    if (it != theorems.end()) {
+        theorems.insert_or_assign(ptr, ptr);
+    }
+    for (auto &[thm_str, children]: children_for_theorem) {
+        for (size_t i = 0; i < children.size(); i++) {
+            auto &child = children[i];
+            if (*child == *ptr) {
+                children[i] = ptr;
+            }
+        }
+    }
+    for (auto &[thm_str, parent]: parent_for_theorem) {
+        if (parent && *parent == *ptr) {
+            parent_for_theorem.insert_or_assign(thm_str, ptr);
+        }
+    }
+    for (auto &[thm_str, seen_set]: seen) {
+        if (seen_set.contains(ptr)) {
+            seen_set.insert(ptr);
+        }
+    }
+    if (*root == *ptr) {
+        root = ptr;
+    }
+}
+
 
 void HTPSNode::reset_HTPS_stats() {
     // implies we will simply set logW to the first value we receive
@@ -1261,6 +1289,9 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
     htps.simulations = std::vector<std::shared_ptr<Simulation>>();
     for (const auto &sim: j["simulations"]) {
         htps.simulations.push_back(std::make_shared<Simulation>(Simulation::from_json(sim)));
+    }
+    for (auto &sim: htps.simulations) {
+        sim->deduplicate(htps.root);
     }
     TheoremMap<std::vector<std::shared_ptr<Simulation>>> simulations_for_theorem;
     if (j["simulations_for_theorem"].is_null())

@@ -168,7 +168,7 @@ void Policy::mcts_rpo(const std::vector<double> &q_values, const std::vector<dou
 
     std::vector<double> scaled_pi_values(q_values.size());
 
-    double alpha_min, alpha_max = 0;
+    double alpha_min = 0, alpha_max = 0;
 
     for (size_t i = 0; i < q_values.size(); i++) {
         scaled_pi_values[i] = pi_values[i] * multiplier;

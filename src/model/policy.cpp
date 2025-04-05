@@ -116,7 +116,7 @@ double Policy::find_rpo_alpha(double alpha_min, double alpha_max, const std::vec
             }
             pi_difference_sum += scaled_pi_values[i] / diff;
         }
-        if ((pi_difference_sum - 1) < TOLERANCE) {
+        if (std::abs(pi_difference_sum - 1) < TOLERANCE) {
             return alpha_mid;
         }
         if (pi_difference_sum > 1)

@@ -318,6 +318,8 @@ namespace htps {
         explicit operator nlohmann::json() const;
 
         static Simulation from_json(const nlohmann::json &j);
+
+        void deduplicate(const std::shared_ptr<theorem> &ptr);
     };
 }
 

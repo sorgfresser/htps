@@ -75,9 +75,6 @@ namespace htps {
     };
 
     struct theorem {
-#ifdef PYTHON_BINDINGS
-        PyObject_HEAD
-#endif
         std::string conclusion;
         std::vector<hypothesis> hypotheses;
         std::string unique_string;

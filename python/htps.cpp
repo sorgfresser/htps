@@ -709,46 +709,39 @@ NULL,
 (newfunc)Context_new,
 };
 
+typedef struct {
+    PyObject_HEAD
+    htps::theorem cpp_obj;
+    PyObject *metadata;
+} PyTheorem;
+
 
 static void Theorem_dealloc(PyObject *self) {
-    auto *thm = (htps::theorem *) self;
-    thm->conclusion.~basic_string();
-    thm->hypotheses.~vector();
-    thm->unique_string.~basic_string();
-    thm->ctx.~context();
-    thm->past_tactics.~vector();
-    for (const auto &pair : thm->metadata) {
-        if (pair.second.type() == typeid(PyObject*)) {
-            Py_XDECREF(std::any_cast<PyObject*>(pair.second));
-        }
-    }
-    thm->metadata.~unordered_map();
+    auto *thm = (PyTheorem *) self;
+    // Deallocate the underlying C++ object
+    thm->cpp_obj.~theorem();
+    Py_DECREF(thm->metadata);
     Py_TYPE(self)->tp_free(self);
 }
 
 static PyObject * Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::theorem *) type->tp_alloc(type, 0);
+    auto *self = (PyTheorem *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
 
-    new (&(self->conclusion)) std::string();
-    new (&(self->hypotheses)) std::vector<htps::hypothesis>();
-    new (&(self->unique_string)) std::string();
-    new (&(self->ctx)) htps::context();
-    new (&(self->past_tactics)) std::vector<htps::tactic>();
-    new (&(self->metadata)) std::unordered_map<std::string, std::string>();
+    new (&(self->cpp_obj)) htps::theorem();
+    self->metadata = PyDict_New();
 
     return (PyObject *) self;
 }
 
 static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
-    auto *t = (htps::theorem *) self;
+    auto *t = (PyTheorem *) self;
     const char *unique_str = nullptr;
     const char *conclusion = nullptr;
     PyObject *context, *hypotheses, *past_tactics, *metadata;
-    metadata = NULL;
     static const char *kwlist[] = { "conclusion", "unique_string", "hypotheses", "context", "past_tactics", "metadata",NULL };
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ssOOO|O", const_cast<char**>(kwlist), &conclusion, &unique_str, &hypotheses, &context, &past_tactics, &metadata))
         return -1;
@@ -757,33 +750,10 @@ static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "context must be a Context object");
         return -1;
     }
-    bool metadata_created = false; // A bit ugly, but we have to decref this later if we created it
-    if (metadata == nullptr || metadata == Py_None) {
-        metadata = PyDict_New();
-        if (!metadata) {
-            return -1;
-        }
-        metadata_created = true;
-    }
+
     if (!PyObject_TypeCheck(metadata, &PyDict_Type)) {
         PyErr_SetString(PyExc_TypeError, "metadata must be a dict");
         return -1;
-    }
-    // Throw python objects into unordered map directly
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-    std::unordered_map<std::string, std::any> metadata_map;
-    while (PyDict_Next(metadata, &pos, &key, &value)) {
-        if (!PyUnicode_Check(key)) {
-            PyErr_SetString(PyExc_TypeError, "metadata keys must be strings");
-            return -1;
-        }
-        const char *k = PyUnicode_AsUTF8(key);
-        Py_INCREF(value);
-        metadata_map[k] = value;
-    }
-    if (metadata_created) {
-        Py_DECREF(metadata);
     }
 
     std::vector<htps::hypothesis> theses;
@@ -827,26 +797,27 @@ static int Theorem_init(PyObject* self, PyObject * args, PyObject *kwargs) {
 
     auto *c_ctx = (htps::context*) context;
     // Copy underlying Lean context
-    t->set_context(*c_ctx);
-    t->unique_string = unique_str;
-    t->conclusion = conclusion;
-    t->hypotheses = theses;
-    t->metadata = metadata_map;
-    t->set_tactics(tacs);
+    t->cpp_obj.set_context(*c_ctx);
+    t->cpp_obj.unique_string = unique_str;
+    t->cpp_obj.conclusion = conclusion;
+    t->cpp_obj.hypotheses = theses;
+    t->cpp_obj.past_tactics = tacs;
+    Py_INCREF(metadata);
+    t->metadata = metadata;
     return 0;
 }
 
 static PyObject *Theorem_get_context(PyObject *self, void *closure) {
-    auto *thm = (htps::theorem *) self;
+    auto *thm = (PyTheorem *) self;
     auto *new_ctx = (htps::context *) Context_new(&ContextType, NULL, NULL);
     if (!new_ctx)
         return PyErr_NoMemory();
-    new_ctx->namespaces = thm->ctx.namespaces;
+    new_ctx->namespaces = thm->cpp_obj.ctx.namespaces;
     return (PyObject*) new_ctx;
 }
 
 static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::theorem *) self;
+    auto *thm = (PyTheorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new context is not set");
         return -1;
@@ -856,19 +827,19 @@ static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
         return -1;
     }
     auto *new_ctx = (htps::context *) value;
-    thm->set_context(*new_ctx);
+    thm->cpp_obj.set_context(*new_ctx);
     return 0;
 }
 
 static PyObject *Theorem_get_hypotheses(PyObject *self, void *closure) {
-    auto *thm = (htps::theorem *) self;
-    PyObject *list = PyList_New(thm->hypotheses.size());
+    auto *thm = (PyTheorem *) self;
+    PyObject *list = PyList_New(thm->cpp_obj.hypotheses.size());
     if (!list)
         return PyErr_NoMemory();
 
-    for (size_t i = 0; i < thm->hypotheses.size(); i++) {
+    for (size_t i = 0; i < thm->cpp_obj.hypotheses.size(); i++) {
         // Call the class to get a new object
-        PyObject *args = Py_BuildValue("ss", thm->hypotheses[i].identifier.c_str(), thm->hypotheses[i].type.c_str());
+        PyObject *args = Py_BuildValue("ss", thm->cpp_obj.hypotheses[i].identifier.c_str(), thm->cpp_obj.hypotheses[i].type.c_str());
         if (!args) {
             return NULL;
         }
@@ -886,7 +857,7 @@ static PyObject *Theorem_get_hypotheses(PyObject *self, void *closure) {
 
 
 static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::theorem *) self;
+    auto *thm = (PyTheorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new hypotheses is not set");
         return -1;
@@ -912,18 +883,18 @@ static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    thm->hypotheses = new_hypotheses;
+    thm->cpp_obj.hypotheses = new_hypotheses;
     return 0;
 }
 
 static PyObject *Theorem_get_past_tactics(PyObject *self, void *closure) {
-    auto *thm = (htps::theorem *) self;
-    PyObject *list = PyList_New(thm->past_tactics.size());
+    auto *thm = (PyTheorem *) self;
+    PyObject *list = PyList_New(thm->cpp_obj.past_tactics.size());
     if (!list)
         return PyErr_NoMemory();
 
-    for (size_t i = 0; i < thm->past_tactics.size(); i++) {
-        PyObject *args = Py_BuildValue("sOn", thm->past_tactics[i].unique_string.c_str(), thm->past_tactics[i].is_valid ? Py_True : Py_False, (Py_ssize_t) thm->past_tactics[i].duration);
+    for (size_t i = 0; i < thm->cpp_obj.past_tactics.size(); i++) {
+        PyObject *args = Py_BuildValue("sOn", thm->cpp_obj.past_tactics[i].unique_string.c_str(), thm->cpp_obj.past_tactics[i].is_valid ? Py_True : Py_False, (Py_ssize_t) thm->past_tactics[i].duration);
         if (!args) {
             return NULL;
         }
@@ -940,7 +911,7 @@ static PyObject *Theorem_get_past_tactics(PyObject *self, void *closure) {
 }
 
 static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::theorem *) self;
+    auto *thm = (PyTheorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new past tactics is not set");
         return -1;
@@ -964,49 +935,19 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    thm->set_tactics(new_tactics);
+    thm->cpp_obj.set_tactics(new_tactics);
     return 0;
 }
 
 static PyObject *Theorem_get_dict(PyObject *self, void *closure) {
-    auto *thm = (htps::theorem *) self;
-    // Convert metadata to PyDict
-    PyObject *py_dict = PyDict_New();
-    if (!py_dict)
-        return PyErr_NoMemory();
-    for (const auto &pair : thm->metadata) {
-        PyObject *key = PyObject_from_string(pair.first);
-        if (!key) {
-            Py_DECREF(py_dict);
-            return NULL;
-        }
-        PyObject *value;
-        if (pair.second.type() == typeid(PyObject*)) {
-            value = std::any_cast<PyObject*>(pair.second);
-            Py_INCREF(value);
-        } else {
-            PyErr_SetString(PyExc_RuntimeError, "some metadata value is not a PyObject");
-            Py_DECREF(key);
-            Py_DECREF(py_dict);
-            return NULL;
-        }
-        if (!value) {
-            Py_DECREF(key);
-            Py_DECREF(py_dict);
-            return NULL;
-        }
-        if (PyDict_SetItem(py_dict, key, value) < 0) {
-            Py_DECREF(key);
-            Py_DECREF(value);
-            Py_DECREF(py_dict);
-            return NULL;
-        }
-    }
+    auto *thm = (PyTheorem *) self;
+    PyObject *py_dict = thm->metadata;
+    Py_INCREF(py_dict);
     return py_dict;
 }
 
 static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
-    auto *thm = (htps::theorem *) self;
+    auto *thm = (PyTheorem *) self;
     if (value == NULL) {
         PyErr_SetString(PyExc_TypeError, "new dictionary is not set");
         return -1;
@@ -1015,41 +956,29 @@ static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "new dictionary must be a dict");
         return -1;
     }
-    std::unordered_map<std::string, std::any> new_metadata;
-    PyObject *key, *val;
-    Py_ssize_t pos = 0;
-    while (PyDict_Next(value, &pos, &key, &val)) {
-        if (!PyUnicode_Check(key)) {
-            PyErr_SetString(PyExc_TypeError, "metadata keys must be strings");
-            return -1;
-        }
-        const char *k = PyUnicode_AsUTF8(key);
-        if (!k) {
-            PyErr_SetString(PyExc_RuntimeError, "could not convert key to string");
-            return -1;
-        }
-        Py_INCREF(val);
-        new_metadata[k] = val;
-    }
-
-    for (const auto &pair : thm->metadata) {
-        if (pair.second.type() == typeid(PyObject*)) {
-            Py_XDECREF(std::any_cast<PyObject*>(pair.second));
-        }
-    }
-    thm->metadata = new_metadata;
+    Py_INCREF(value);
+    thm->metadata = value;
     return 0;
 }
 
+static PyObject *Theorem_get_conclusion(PyObject *self, void *closure) {
+    auto *thm = (PyTheorem *) self;
+    return PyObject_from_string(thm->cpp_obj.conclusion);
+}
+
+static PyObject *Theorem_get_unique_string(PyObject *self, void *closure) {
+    auto *thm = (PyTheorem *) self;
+    return PyObject_from_string(thm->cpp_obj.unique_string);
+}
 
 
 static PyMemberDef Theorem_members[] = {
-    {"conclusion", T_STRING, offsetof(htps::theorem, conclusion), READONLY, "Conclusion of the theorem"},
-    {"unique_string", T_STRING, offsetof(htps::theorem, unique_string), READONLY, "Unique string of the theorem"},
     {NULL}
 };
 
 static PyGetSetDef Theorem_getsetters[] = {
+        {"conclusion", Theorem_get_conclusion, NULL, "Conclusion of the theorem", NULL},
+        {"unique_string", Theorem_get_unique_string, NULL, "Unique string of the theorem", NULL},
     {"context", Theorem_get_context, Theorem_set_context, "Context of the theorem", NULL},
     {"hypotheses", Theorem_get_hypotheses, Theorem_set_hypotheses, "Hypotheses of theorem", NULL},
     {"past_tactics", Theorem_get_past_tactics, Theorem_set_past_tactics, "Past tactics of theorem", NULL},
@@ -1059,7 +988,7 @@ static PyGetSetDef Theorem_getsetters[] = {
 
 static PyTypeObject TheoremType = {
     PyObject_HEAD_INIT(NULL) "htps.Theorem",
-sizeof(htps::theorem),
+sizeof(PyTheorem),
 0,
 (destructor)Theorem_dealloc,
 NULL,
@@ -1103,23 +1032,13 @@ PyObject* Theorem_NewFromShared(const std::shared_ptr<htps::theorem>& thm_ptr) {
     PyObject *obj = Theorem_new(&TheoremType, NULL, NULL);
     if (obj == NULL)
         return NULL;
-    auto *c_obj = (htps::theorem *) obj;
-    c_obj->conclusion = thm->conclusion;
-    c_obj->unique_string  = thm->unique_string;
-    c_obj->set_context(thm->ctx);
-    c_obj->hypotheses = thm->hypotheses;
-    c_obj->past_tactics = thm->past_tactics;
-    std::unordered_map<std::string, std::any> metadata;
-    for (const auto &pair : thm->metadata) {
-        if (pair.second.type() == typeid(PyObject*)) {
-            auto *value = std::any_cast<PyObject*>(pair.second);
-            Py_INCREF(value);
-            metadata[pair.first] = value;
-        } else {
-            metadata[pair.first] = pair.second;
-        }
-    }
-    c_obj->metadata = metadata;
+    auto *py_thm = (PyTheorem *) obj;
+    py_thm->cpp_obj.conclusion = thm->conclusion;
+    py_thm->cpp_obj.unique_string  = thm->unique_string;
+    py_thm->cpp_obj.set_context(thm->ctx);
+    py_thm->cpp_obj.hypotheses = thm->hypotheses;
+    py_thm->cpp_obj.past_tactics = thm->past_tactics;
+    py_thm->metadata = PyDict_New();
 
     return obj;
 }

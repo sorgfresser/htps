@@ -516,6 +516,11 @@ def test_metadata_garbage_collection():
     assert theorems[0].metadata == {"proof_state_idx": 0}
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
+    x = theorems[0].metadata
+    print(x)
+    print(x)
+    print(x)
+    assert x == {"proof_state_idx": 1}
     assert theorems[0].metadata == {"proof_state_idx": 1}
     expansion = _create_expansion2(theorems[0])
     search.expand_and_backup([expansion])

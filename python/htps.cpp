@@ -711,7 +711,10 @@ struct PyTheorem {
     std::shared_ptr<htps::theorem> cpp_obj;
 
     PyObject* py_metadata(){
-        return std::any_cast<PyObject *>(cpp_obj->metadata);
+        if (cpp_obj->metadata.has_value()) {
+            return std::any_cast<PyObject *>(cpp_obj->metadata);
+        }
+            return NULL;
     };
 };
 
@@ -816,9 +819,9 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     t->cpp_obj->conclusion = conclusion;
     t->cpp_obj->hypotheses = theses;
     t->cpp_obj->past_tactics = tacs;
-    PyObject *old = std::any_cast<PyObject *>(t->cpp_obj->metadata);
+    PyObject *old = t->py_metadata();
     t->cpp_obj->metadata = metadata;
-    Py_DECREF(old);
+    Py_XDECREF(old);
     return 0;
 }
 
@@ -957,8 +960,10 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
 static PyObject *Theorem_get_dict(PyObject *self, void *closure) {
     auto *thm = (PyTheorem *) self;
     PyObject *py_dict = thm->py_metadata();
-    auto *new_dict = PyDict_Copy(py_dict);
-    return new_dict;
+    Py_XINCREF(py_dict);
+    if (!py_dict)
+        return PyDict_New();
+    return py_dict;
 }
 
 static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
@@ -971,9 +976,10 @@ static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "new dictionary must be a dict");
         return -1;
     }
-    auto old = std::any_cast<PyObject *>(thm->cpp_obj->metadata);
-    thm->cpp_obj->metadata = PyDict_Copy(value);
-    Py_DECREF(old);
+    auto old = thm->py_metadata();
+    Py_INCREF(value);
+    thm->cpp_obj->metadata = value;
+    Py_XDECREF(old);
     return 0;
 }
 
@@ -1055,13 +1061,15 @@ PyObject *Theorem_NewFromShared(const std::shared_ptr<htps::theorem> &thm_ptr) {
     py_thm->cpp_obj->hypotheses = thm->hypotheses;
     py_thm->cpp_obj->past_tactics = thm->past_tactics;
     printf("Copy dict!\n");
-    PyObject *copiedDict = PyDict_Copy(std::any_cast<PyObject *>(thm->metadata));
-    printf("Copy dict finished!\n");
-    if (copiedDict == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Could not copy dict");
-        return NULL;
+    if (thm->metadata.has_value()) {
+        PyObject *copiedDict = PyDict_Copy(std::any_cast<PyObject *>(thm->metadata));
+        printf("Copy dict finished!\n");
+        if (copiedDict == NULL) {
+            PyErr_SetString(PyExc_MemoryError, "Could not copy dict");
+            return NULL;
+        }
+        py_thm->cpp_obj->metadata = copiedDict;
     }
-    py_thm->cpp_obj->metadata = copiedDict;
     return obj;
 }
 

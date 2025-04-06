@@ -80,7 +80,7 @@ namespace htps {
         std::string unique_string;
         context ctx;
         std::vector<tactic> past_tactics;
-        std::unordered_map<std::string, std::any> metadata;
+        std::any metadata;
 
         theorem() = default;
 

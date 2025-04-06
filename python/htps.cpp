@@ -718,7 +718,9 @@ struct PyTheorem {
 
 static void Theorem_dealloc(PyObject *self) {
     auto *thm = (PyTheorem *) self;
-    Py_DECREF(thm->py_metadata());
+    if (thm && thm->cpp_obj.use_count() == 1) {
+        Py_DECREF(thm->py_metadata());
+    }
     Py_TYPE(self)->tp_free(self);
 }
 
@@ -755,8 +757,12 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             return -1;
         }
     }
+    else {
+        Py_INCREF(metadata);
+    }
     if (!PyObject_TypeCheck(metadata, &PyDict_Type)) {
         PyErr_SetString(PyExc_TypeError, "metadata must be a dict");
+        Py_DECREF(metadata);
         return -1;
     }
 
@@ -764,6 +770,7 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     PyObject *iterator = PyObject_GetIter(hypotheses);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "hypotheses must be iterable!");
+        Py_DECREF(metadata);
         return -1;
     }
     PyObject *item;
@@ -772,6 +779,7 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             PyErr_SetString(PyExc_TypeError, "each hypothesis must be a Hypothesis object");
             Py_DECREF(item);
             Py_DECREF(iterator);
+            Py_DECREF(metadata);
             return -1;
         }
         auto *h = (htps::hypothesis *) item;
@@ -783,6 +791,7 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     iterator = PyObject_GetIter(past_tactics);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "past_tactics must be iterable!");
+        Py_DECREF(metadata);
         return -1;
     }
     std::vector<htps::tactic> tacs;
@@ -791,6 +800,7 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             PyErr_SetString(PyExc_TypeError, "each tactic must be a Tactic object");
             Py_DECREF(item);
             Py_DECREF(iterator);
+            Py_DECREF(metadata);
             return -1;
         }
         auto *tactic = (htps::tactic *) item;
@@ -806,8 +816,9 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     t->cpp_obj->conclusion = conclusion;
     t->cpp_obj->hypotheses = theses;
     t->cpp_obj->past_tactics = tacs;
-    Py_INCREF(metadata);
+    PyObject *old = std::any_cast<PyObject *>(t->cpp_obj->metadata);
     t->cpp_obj->metadata = metadata;
+    Py_DECREF(old);
     return 0;
 }
 
@@ -946,8 +957,8 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
 static PyObject *Theorem_get_dict(PyObject *self, void *closure) {
     auto *thm = (PyTheorem *) self;
     PyObject *py_dict = thm->py_metadata();
-    Py_INCREF(py_dict);
-    return py_dict;
+    auto *new_dict = PyDict_Copy(py_dict);
+    return new_dict;
 }
 
 static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
@@ -960,9 +971,8 @@ static int Theorem_set_dict(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "new dictionary must be a dict");
         return -1;
     }
-    Py_INCREF(value);
     auto old = std::any_cast<PyObject *>(thm->cpp_obj->metadata);
-    thm->cpp_obj->metadata = value;
+    thm->cpp_obj->metadata = PyDict_Copy(value);
     Py_DECREF(old);
     return 0;
 }
@@ -1073,6 +1083,7 @@ static PyObject *EnvEffect_new(PyTypeObject *type, PyObject *args, PyObject *kwa
     if (self == NULL)
         return PyErr_NoMemory();
     auto shared_thm = static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>());
+    shared_thm->metadata = PyDict_New();
     auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>());
     self->goal = shared_thm;
     self->children = std::vector<std::shared_ptr<htps::theorem>>();

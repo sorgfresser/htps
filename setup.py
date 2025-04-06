@@ -10,8 +10,8 @@ module = Extension(
     include_dirs=["src", "external/glob/single_include"],
     runtime_library_dirs=[],
     libraries=[],
-    extra_compile_args=["-std=c++20", "-O2", "-pedantic", "-DPYTHON_BINDINGS", "-DVERBOSE_PRINTS", "-fsanitize=undefined"],
-    extra_link_args=["-fsanitize=undefined"],
+    extra_compile_args=["-std=c++20", "-O2", "-pedantic", "-DPYTHON_BINDINGS", "-DVERBOSE_PRINTS", "-fsanitize=address"],
+    extra_link_args=["-fsanitize=address"],
     define_macros=[],
 )
 

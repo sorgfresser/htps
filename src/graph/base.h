@@ -75,15 +75,12 @@ namespace htps {
     };
 
     struct theorem {
-#ifdef PYTHON_BINDINGS
-        PyObject_HEAD
-#endif
         std::string conclusion;
         std::vector<hypothesis> hypotheses;
         std::string unique_string;
         context ctx;
         std::vector<tactic> past_tactics;
-        std::unordered_map<std::string, std::any> metadata;
+        std::any metadata;
 
         theorem() = default;
 

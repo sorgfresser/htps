@@ -18,7 +18,7 @@ def _compare_tactics(ta, tb):
 
 def _compare_theorem(a, b):
     assert a.conclusion == b.conclusion and a.unique_string == b.unique_string and \
-           a.context.namespaces == b.context.namespaces
+           a.context.namespaces == b.context.namespaces and a.metadata == b.metadata
     _compare_hypotheses(a.hypotheses, b.hypotheses)
     _compare_tactics(a.past_tactics, b.past_tactics)
 
@@ -203,6 +203,8 @@ def test_env_expansion():
     tactics = [tactic_a, tactic_b, tactic_c]
 
     goal = Theorem("goal_conclusion", "goal_unique", hypotheses, context, tactics)
+    goal.metadata = {"test": 1}
+    assert goal.metadata == {"test": 1}
 
     effect1 = EnvEffect(goal, tactic_b, [])
     effect2 = EnvEffect(goal, tactic_c, [goal])
@@ -231,6 +233,7 @@ def test_env_expansion():
         children_for_tactic=children_for_tactic,
         priors=priors
     )
+    assert expansion.thm.metadata == goal.metadata == {"test": 1}
     _compare_theorem(expansion.thm, goal)
     assert expansion.expander_duration == expander_duration, "expander_duration mismatch"
     assert expansion.generation_duration == generation_duration, "generation_duration mismatch"
@@ -455,6 +458,7 @@ def _create_expansion(theorem):
     child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
     child_thm.metadata = {"proof_state_idx": 1}
     child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    child_thm2.metadata = {"proof_state_idx": 2}
     effects = [EnvEffect(theorem, tactic_a, [child_thm]), EnvEffect(theorem, tactic_b, [child_thm2])]
     times = [0, 0]
     children_for_tactic = [[child_thm], [child_thm2]]
@@ -470,6 +474,7 @@ def _create_expansion2(theorem):
     child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
     child_thm.metadata = {"proof_state_idx": 2}
     child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
+    child_thm2.metadata={"proof_state_idx": 3}
     effects = [EnvEffect(theorem, tactic_a, [child_thm]), EnvEffect(theorem, tactic_b, [child_thm2])]
     times = [0, 0]
     children_for_tactic = [[child_thm], [child_thm2]]
@@ -508,6 +513,7 @@ def test_metadata_garbage_collection():
     assert theorems[0].metadata == {"proof_state_idx": 0}
     expansion = _create_expansion(theorems[0])
     search.expand_and_backup([expansion])
+    assert theorems[0].metadata == {"proof_state_idx": 0}
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
     assert theorems[0].metadata == {"proof_state_idx": 1}

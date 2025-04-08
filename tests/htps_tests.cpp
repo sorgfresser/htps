@@ -76,6 +76,7 @@ protected:
 
         // Construct HTPS using the root.
         htps_instance = std::make_unique<htps::HTPS>(root, dummyParams, dummyPolicy);
+        htps::seed = 42;
     }
 };
 

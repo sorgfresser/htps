@@ -18,6 +18,7 @@ jobs:
     container:
       env:
         PLAT: ${{ env.PLAT }}
+        SEED: 42
       image: "quay.io/pypa/manylinux_2_28_x86_64"
       volumes:
         - ${{ github.workspace }}:/io

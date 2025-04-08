@@ -596,7 +596,7 @@ void HTPSNode::compute_policy(std::vector<double> &result, bool force_expansion)
     }
 
     for (std::size_t i = 0; i < tactics.size(); i++) {
-        if (!tactics[i]->is_valid || (expandable_only && !tactic_expandable[i])) {
+        if (killed(i) || (expandable_only && !tactic_expandable[i])) {
             q_values[i] = MIN_FLOAT;
             full_counts[i] = 0;
         }

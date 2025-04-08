@@ -34,7 +34,7 @@ size_t htps::seed = get_seed();
 std::mt19937 htps::gen = setup_gen();
 std::uniform_real_distribution<double> htps::dis = std::uniform_real_distribution<double>(0, 1);
 
-std::shared_ptr<theorem> HTPSSampleEffect::get_goal() const {
+TheoremPointer HTPSSampleEffect::get_goal() const {
     return goal;
 }
 
@@ -42,22 +42,22 @@ std::shared_ptr<tactic> HTPSSampleEffect::get_tactic() const {
     return tac;
 }
 
-std::vector<std::shared_ptr<theorem>> HTPSSampleEffect::get_children() const {
+std::vector<TheoremPointer> HTPSSampleEffect::get_children() const {
     return children;
 }
 
-void HTPSSampleEffect::get_children(std::vector<std::shared_ptr<theorem>> &children_vec) const {
+void HTPSSampleEffect::get_children(std::vector<TheoremPointer> &children_vec) const {
     children_vec = children;
 }
 
 
-std::vector<std::shared_ptr<theorem>> Simulation::leaves() const {
-    std::vector<std::shared_ptr<theorem>> result;
+std::vector<TheoremPointer> Simulation::leaves() const {
+    std::vector<TheoremPointer> result;
     leaves(result);
     return result;
 }
 
-void Simulation::leaves(std::vector<std::shared_ptr<theorem>> &leaves_vector) const {
+void Simulation::leaves(std::vector<TheoremPointer> &leaves_vector) const {
     for (const auto &[thm_str, children]: children_for_theorem)
         if (children.empty())
             leaves_vector.push_back(theorems.at(thm_str));
@@ -100,19 +100,19 @@ bool Simulation::operator==(const Simulation &other) const {
     return has_children && has_tactics;
 }
 
-void Simulation::set_depth(const std::shared_ptr<theorem> &thm, size_t d) {
+void Simulation::set_depth(const TheoremPointer &thm, size_t d) {
     depth.insert_or_assign(thm, d);
 }
 
-size_t Simulation::get_depth(const std::shared_ptr<theorem> &thm) const {
+size_t Simulation::get_depth(const TheoremPointer &thm) const {
     return depth.at(thm);
 }
 
-bool Simulation::has_depth(const std::shared_ptr<theorem> &thm) const {
+bool Simulation::has_depth(const TheoremPointer &thm) const {
     return depth.contains(thm);
 }
 
-void Simulation::update_depth(const std::shared_ptr<theorem> &thm, size_t d) {
+void Simulation::update_depth(const TheoremPointer &thm, size_t d) {
     auto it = depth.find(thm);
     size_t min_depth;
     if (it != depth.end()) {
@@ -123,54 +123,54 @@ void Simulation::update_depth(const std::shared_ptr<theorem> &thm, size_t d) {
     depth.insert_or_assign(thm, min_depth);
 }
 
-void Simulation::set_value(const std::shared_ptr<theorem> &thm, double v) {
+void Simulation::set_value(const TheoremPointer &thm, double v) {
     values.insert_or_assign(thm, v);
 }
 
-double Simulation::get_value(const std::shared_ptr<theorem> &thm) const {
+double Simulation::get_value(const TheoremPointer &thm) const {
     return values.at(thm);
 }
 
-void Simulation::set_solved(const std::shared_ptr<theorem> &thm, bool s) {
+void Simulation::set_solved(const TheoremPointer &thm, bool s) {
     solved.insert_or_assign(thm, s);
 }
 
-bool Simulation::is_solved(const std::shared_ptr<theorem> &thm) const {
+bool Simulation::is_solved(const TheoremPointer &thm) const {
     return solved.at(thm);
 }
 
-void Simulation::set_tactic(const std::shared_ptr<theorem> &thm, const std::shared_ptr<tactic> &tac) {
+void Simulation::set_tactic(const TheoremPointer &thm, const std::shared_ptr<tactic> &tac) {
     tactics.insert_or_assign(thm, tac);
 }
 
-std::shared_ptr<tactic> Simulation::get_tactic(const std::shared_ptr<theorem> &thm) const {
+std::shared_ptr<tactic> Simulation::get_tactic(const TheoremPointer &thm) const {
     return tactics.at(thm);
 }
 
-void Simulation::set_tactic_id(const std::shared_ptr<theorem> &thm, size_t id) {
+void Simulation::set_tactic_id(const TheoremPointer &thm, size_t id) {
     tactic_ids.insert_or_assign(thm, id);
 }
 
-size_t Simulation::get_tactic_id(const std::shared_ptr<theorem> &thm) const {
+size_t Simulation::get_tactic_id(const TheoremPointer &thm) const {
     return tactic_ids.at(thm);
 }
 
-void Simulation::set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet &set) {
+void Simulation::set_theorem_set(const TheoremPointer &thm, TheoremSet &set) {
     seen.insert_or_assign(thm, set);
 }
 
-void Simulation::set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet set) {
+void Simulation::set_theorem_set(const TheoremPointer &thm, TheoremSet set) {
     seen.insert_or_assign(thm, set);
 }
 
-TheoremSet &Simulation::get_theorem_set(const std::shared_ptr<theorem> &thm) {
+TheoremSet &Simulation::get_theorem_set(const TheoremPointer &thm) {
     if (!seen.contains(thm))
         set_theorem_set(thm, TheoremSet());
     return seen.at(thm);
 }
 
 void
-Simulation::add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t thm_depth) {
+Simulation::add_theorem(const TheoremPointer &thm, const TheoremPointer &parent, size_t thm_depth) {
     assert(theorems.contains(parent));
     assert(!theorems.contains(thm));
     assert(!depth.contains(thm));
@@ -185,7 +185,7 @@ Simulation::add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_p
     seen.insert_or_assign(thm, seen_set);
     children_for_theorem.at(parent).push_back(thm);
     parent_for_theorem.insert_or_assign(thm, parent);
-    children_for_theorem.insert_or_assign(thm, std::vector<std::shared_ptr<theorem>>());
+    children_for_theorem.insert_or_assign(thm, std::vector<TheoremPointer>());
     virtual_count_added.insert_or_assign(thm, false);
 }
 
@@ -197,24 +197,24 @@ size_t Simulation::leave_count() const {
     return count;
 }
 
-bool Simulation::erase_theorem_set(const std::shared_ptr<theorem> &thm) {
+bool Simulation::erase_theorem_set(const TheoremPointer &thm) {
     return seen.erase(thm);
 }
 
-void Simulation::receive_expansion(const std::shared_ptr<theorem> &thm, double value, bool is_solved) {
+void Simulation::receive_expansion(const TheoremPointer &thm, double value, bool is_solved) {
     assert(expansions > 0);
     set_value(thm, value);
     set_solved(thm, is_solved);
     expansions -= 1;
 }
 
-bool Simulation::get_virtual_count_added(const std::shared_ptr<theorem> &thm) const {
+bool Simulation::get_virtual_count_added(const TheoremPointer &thm) const {
     if (!virtual_count_added.contains(thm))
         throw std::runtime_error("Virtual count not found");
     return virtual_count_added.at(thm);
 }
 
-void Simulation::set_virtual_count_added(const std::shared_ptr<theorem> &thm, bool value) {
+void Simulation::set_virtual_count_added(const TheoremPointer &thm, bool value) {
     virtual_count_added.insert_or_assign(thm, value);
 }
 
@@ -222,18 +222,18 @@ bool Simulation::should_backup() const {
     return expansions == 0;
 }
 
-std::shared_ptr<theorem> Simulation::parent(const std::shared_ptr<theorem> &thm) const {
+TheoremPointer Simulation::parent(const TheoremPointer &thm) const {
     if (!parent_for_theorem.contains(thm)) {
         throw std::runtime_error("Parent not found");
     }
     return parent_for_theorem.at(thm);
 }
 
-std::vector<std::shared_ptr<theorem>> Simulation::get_children(const std::shared_ptr<theorem> &thm) const {
+std::vector<TheoremPointer> Simulation::get_children(const TheoremPointer &thm) const {
     return children_for_theorem.at(thm);
 }
 
-std::vector<double> Simulation::child_values(const std::shared_ptr<theorem> &thm) const {
+std::vector<double> Simulation::child_values(const TheoremPointer &thm) const {
     std::vector<double> result;
     for (const auto &child: children_for_theorem.at(thm)) {
         result.push_back(values.at(child));
@@ -272,35 +272,35 @@ Simulation::operator nlohmann::json() const {
 
 Simulation Simulation::from_json(const nlohmann::json &j) {
     Simulation s;
-    s.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
-    TheoremMap<std::shared_ptr<theorem>> thms;
+    s.root = j["root"];
+    TheoremMap<TheoremPointer> thms;
     for (const auto &[thm_str, thm]: j["theorems"].items()) {
-        thms.insert_or_assign(thm_str, std::make_shared<theorem>(theorem::from_json(thm)));
+        thms.insert_or_assign(thm_str,thm);
     }
     s.theorems = thms;
     s.tactic_ids = TheoremMap<size_t>::from_json(j["tactic_ids"]);
     TheoremMap<std::shared_ptr<tactic>> tacs;
     for (const auto &[thm_str, tac]: j["tactics"].items()) {
-        tacs.insert_or_assign(thm_str, std::make_shared<tactic>(tactic::from_json(tac)));
+        tacs.insert_or_assign(thm_str, tac);
     }
     s.tactics = tacs;
     s.depth = TheoremMap<size_t>::from_json(j["depth"]);
-    TheoremMap<std::vector<std::shared_ptr<theorem>>> children;
+    TheoremMap<std::vector<TheoremPointer>> children;
     for (const auto &[thm_str, children_vec]: j["children_for_theorem"].items()) {
-        std::vector<std::shared_ptr<theorem>> children_vec_;
+        std::vector<TheoremPointer> children_vec_;
         for (const auto &child_str: children_vec) {
-            children_vec_.push_back(std::make_shared<theorem>(theorem::from_json(child_str)));
+            children_vec_.push_back(child_str);
         }
         children.insert_or_assign(thm_str, children_vec_);
     }
     s.children_for_theorem = children;
-    TheoremMap<std::shared_ptr<theorem>> parents;
+    TheoremMap<TheoremPointer> parents;
     for (const auto &[thm_str, parent_str]: j["parent_for_theorem"].items()) {
         if (parent_str.is_null()) {
             parents.insert_or_assign(thm_str, nullptr);
             continue;
         }
-        parents.insert_or_assign(thm_str, std::make_shared<theorem>(theorem::from_json(parent_str)));
+        parents.insert_or_assign(thm_str, parent_str);
     }
     s.parent_for_theorem = parents;
     if (j["values"].is_null()) {
@@ -330,7 +330,7 @@ Simulation Simulation::from_json(const nlohmann::json &j) {
     return s;
 }
 
-void Simulation::deduplicate(const std::shared_ptr<theorem> &ptr) {
+void Simulation::deduplicate(const TheoremPointer &ptr) {
     auto it = theorems.find(ptr);
     if (it != theorems.end()) {
         theorems.insert_or_assign(ptr, ptr);
@@ -693,17 +693,17 @@ bool HTPSNode::has_virtual_count() const {
 
 HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
     HTPSNode node;
-    node.thm = std::make_shared<theorem>(theorem::from_json(j["theorem"]));
+    node.thm =j["theorem"];
     std::vector<std::shared_ptr<tactic>> tactics;
     for (const auto &tac: j["tactics"]) {
-        tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+        tactics.push_back(tac);
     }
     node.tactics = tactics;
-    std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+    std::vector<std::vector<TheoremPointer>> children_for_tactic;
     for (const auto &children: j["children_for_tactic"]) {
-        std::vector<std::shared_ptr<theorem>> children_for_tactic_inner;
+        std::vector<TheoremPointer> children_for_tactic_inner;
         for (const auto &child: children) {
-            children_for_tactic_inner.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+            children_for_tactic_inner.push_back(child);
         }
         children_for_tactic.push_back(children_for_tactic_inner);
     }
@@ -722,7 +722,7 @@ HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
     node.log_critic_value = j["log_critic_value"];
     node.priors = static_cast<std::vector<double>>(j["priors"]);
     node.q_value_solved = j["q_value_solved"];
-    node.policy = std::make_shared<Policy>(Policy::from_json(j["policy"]));
+    node.policy = j["policy"];
     node.exploration = j["exploration"];
     node.tactic_init_value = j["tactic_init_value"];
     node.log_w = static_cast<std::vector<double>>(j["log_w"]);
@@ -846,10 +846,10 @@ void HTPS::get_proof_samples(std::vector<HTPSSampleTactics> &proof_samples_tacti
     proof_samples_tactics.shrink_to_fit();
 }
 
-Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
-                                       std::vector<std::shared_ptr<theorem>> &to_expand) {
+Simulation HTPS::find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
+                                       std::vector<TheoremPointer> &to_expand) {
     Simulation sim = Simulation(root);
-    std::deque<std::shared_ptr<theorem>> to_process;
+    std::deque<TheoremPointer> to_process;
     std::vector<double> node_policy;
     to_process.push_back(root);
 
@@ -858,7 +858,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         printf("To process\n");
 #endif
         node_policy.clear();
-        std::shared_ptr<theorem> current = to_process.front();
+        TheoremPointer current = to_process.front();
         to_process.pop_front();
         if (!nodes.contains(current)) {
             // TODO: in theory there is some depth stuff here?
@@ -941,7 +941,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         sim.erase_theorem_set(current);
     }
 
-    std::vector<std::shared_ptr<theorem>> all_leaves = terminal;
+    std::vector<TheoremPointer> all_leaves = terminal;
     all_leaves.insert(all_leaves.end(), to_expand.begin(), to_expand.end());
     assert(!all_leaves.empty());
     assert(std::all_of(to_expand.begin(), to_expand.end(),
@@ -956,7 +956,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
     return sim;
 }
 
-void HTPS::receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved) {
+void HTPS::receive_expansion(TheoremPointer &thm, double value, bool solved) {
     // has to be log value
     assert(value <= 0);
     if (!simulations_for_theorem.contains(thm))
@@ -1056,7 +1056,7 @@ void HTPS::backup() {
 void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
     auto leaves = sim->leaves();
     bool updated_root = false;
-    std::queue<std::shared_ptr<theorem>> to_process;
+    std::queue<TheoremPointer> to_process;
 
     TheoremMap<size_t> children_propagated;
     for (const auto &leaf: leaves) {
@@ -1117,16 +1117,16 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
     assert(updated_root);
 }
 
-void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+void HTPS::batch_to_expand(std::vector<TheoremPointer> &theorems) {
     propagate_needed = false;
-    TheoremMap<std::shared_ptr<theorem>> result;
+    TheoremMap<TheoremPointer> result;
     theorems.clear();
-    std::vector<std::shared_ptr<theorem>> single_to_expand;
+    std::vector<TheoremPointer> single_to_expand;
 
     for (size_t i = 0; i < params.succ_expansions; i++) {
         single_to_expand.clear();
-        std::vector<std::shared_ptr<theorem>> terminal;
-        std::vector<std::shared_ptr<theorem>> to_expand;
+        std::vector<TheoremPointer> terminal;
+        std::vector<TheoremPointer> to_expand;
         Simulation sim;
         while (!dead_root()) {
             try {
@@ -1166,8 +1166,8 @@ void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
     }
 }
 
-void HTPS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
-                             std::vector<std::shared_ptr<theorem>> &leaves_to_expand) {
+void HTPS::_single_to_expand(std::vector<TheoremPointer> &theorems, Simulation &sim,
+                             std::vector<TheoremPointer> &leaves_to_expand) {
     theorems.clear();
     TheoremSet seen;
     std::shared_ptr<Simulation> sim_ptr = std::make_shared<Simulation>(sim);
@@ -1192,8 +1192,8 @@ void HTPS::_single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Si
     }
 }
 
-std::vector<std::shared_ptr<theorem>> HTPS::batch_to_expand() {
-    std::vector<std::shared_ptr<theorem>> theorems;
+std::vector<TheoremPointer> HTPS::batch_to_expand() {
+    std::vector<TheoremPointer> theorems;
     batch_to_expand(theorems);
     return theorems;
 }
@@ -1225,15 +1225,15 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
 //        HTPS_move();
 }
 
-void HTPS::theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+void HTPS::theorems_to_expand(std::vector<TheoremPointer> &theorems) {
     if (!currently_expanding.empty()) {
         throw std::runtime_error("Currently expanding is not empty, give results first!");
     }
     return batch_to_expand(theorems);
 }
 
-std::vector<std::shared_ptr<theorem>> HTPS::theorems_to_expand() {
-    std::vector<std::shared_ptr<theorem>> theorems;
+std::vector<TheoremPointer> HTPS::theorems_to_expand() {
+    std::vector<TheoremPointer> theorems;
     theorems_to_expand(theorems);
     return theorems;
 }
@@ -1261,7 +1261,7 @@ HTPSResult HTPS::get_result() {
     return {samples_critic, samples_tactics, samples_effects, params.metric, proof_samples_tactics, root, p};
 }
 
-void HTPS::set_root(std::shared_ptr<theorem> &thm) {
+void HTPS::set_root(TheoremPointer &thm) {
     if (!nodes.empty()) {
         throw std::runtime_error("HTPS has already started, can't set root!");
     }
@@ -1278,7 +1278,7 @@ void HTPS::set_params(const htps_params &new_params) {
 
 HTPS HTPS::from_json(const nlohmann::json &j) {
     HTPS htps;
-    htps.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
+    htps.root = j["root"];
     TheoremMap<std::shared_ptr<HTPSNode>> nodes;
     for (const auto &node: j["nodes"]) {
         auto n = HTPSNode::from_json(node);
@@ -1290,12 +1290,12 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
     htps.unexplored_theorems = TheoremSet::from_json(j["unexplored_theorems"]);
     htps.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
     htps.initial_minimum_proof_size = MinimumLengthMap::from_json(j["initial_minimum_proof_size"]);
-    htps.policy = std::make_shared<Policy>(Policy::from_json(j["policy"]));
+    htps.policy = j["policy"];
     htps.params = htps_params::from_json(j["params"]);
     htps.expansion_count = j["expansion_count"];
     htps.simulations = std::vector<std::shared_ptr<Simulation>>();
     for (const auto &sim: j["simulations"]) {
-        htps.simulations.push_back(std::make_shared<Simulation>(Simulation::from_json(sim)));
+        htps.simulations.push_back(sim);
     }
     for (auto &sim: htps.simulations) {
         sim->deduplicate(htps.root);
@@ -1310,7 +1310,7 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
             std::vector<std::shared_ptr<Simulation>> sims;
             for (const auto &s: sim) {
                 // Find the simulation in simulations, use that one
-                std::shared_ptr<Simulation> current_sim = std::make_shared<Simulation>(Simulation::from_json(s));
+                std::shared_ptr<Simulation> current_sim = s;
                 for (size_t i = 0; i < htps.simulations.size(); i++) {
                     if (!sims_used[i] && *htps.simulations[i] == *current_sim) {
                         current_sim = htps.simulations[i];
@@ -1388,7 +1388,7 @@ proof HTPSResult::get_proof() const {
     return p;
 }
 
-std::shared_ptr<theorem> HTPSResult::get_goal() const {
+TheoremPointer HTPSResult::get_goal() const {
     return goal;
 }
 

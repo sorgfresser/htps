@@ -728,7 +728,7 @@ static PyTypeObject ContextType = {
 
 struct PyTheorem {
     PyObject_HEAD
-    std::shared_ptr<htps::theorem> cpp_obj;
+    htps::TheoremPointer cpp_obj;
 
     PyObject* py_metadata(){
         if (cpp_obj->metadata.has_value()) {
@@ -741,8 +741,8 @@ struct PyTheorem {
 
 static void Theorem_dealloc(PyObject *self) {
     auto *thm = (PyTheorem *) self;
-    if (thm && thm->cpp_obj.use_count() == 1) {
-        Py_DECREF(thm->py_metadata());
+    if (thm->cpp_obj.use_count() == 1) {
+        Py_XDECREF(thm->py_metadata());
     }
     Py_TYPE(self)->tp_free(self);
 }
@@ -755,7 +755,6 @@ static PyObject *Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         return NULL;
     }
     self->cpp_obj = std::make_shared<htps::theorem>(htps::theorem());
-    self->cpp_obj->metadata = PyDict_New();
 
     return (PyObject *) self;
 }
@@ -1074,7 +1073,7 @@ static PyTypeObject TheoremType = {
 };
 
 
-PyObject *Theorem_NewFromShared(const std::shared_ptr<htps::theorem> &thm_ptr) {
+PyObject *Theorem_NewFromShared(const htps::TheoremPointer &thm_ptr) {
     auto thm = std::dynamic_pointer_cast<htps::theorem>(thm_ptr);
     PyObject *obj = Theorem_new(&TheoremType, NULL, NULL);
     if (obj == NULL)
@@ -1115,11 +1114,10 @@ static PyObject *EnvEffect_new(PyTypeObject *type, PyObject *args, PyObject *kwa
     auto *self = (htps::env_effect *) type->tp_alloc(type, 0);
     if (self == NULL)
         return PyErr_NoMemory();
-    auto shared_thm = static_pointer_cast<htps::theorem>(std::make_shared<htps::theorem>());
-    shared_thm->metadata = PyDict_New();
-    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>());
+    auto shared_thm =std::make_shared<htps::theorem>();
+    auto shared_tactic = std::make_shared<htps::tactic>();
     self->goal = shared_thm;
-    self->children = std::vector<std::shared_ptr<htps::theorem>>();
+    self->children = std::vector<htps::TheoremPointer>();
     self->tac = shared_tactic;
     return (PyObject *) self;
 }
@@ -1143,7 +1141,7 @@ static int EnvEffect_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "children must be iterable");
         return -1;
     }
-    std::vector<std::shared_ptr<htps::theorem>> children_vec;
+    std::vector<htps::TheoremPointer> children_vec;
     PyObject *item;
     while ((item = PyIter_Next(iterator)) != NULL) {
         if (!PyObject_TypeCheck(item, &TheoremType)) {
@@ -1213,7 +1211,7 @@ static int EnvEffect_set_tac(PyObject *self, PyObject *value, void *closure) {
 
 static PyObject *EnvEffect_get_children(PyObject *self, void *closure) {
     auto *effect = (htps::env_effect *) self;
-    const std::vector<std::shared_ptr<htps::theorem>> &children = effect->children;
+    const std::vector<htps::TheoremPointer> &children = effect->children;
     PyObject *list = PyList_New(children.size());
     if (!list)
         return PyErr_NoMemory();
@@ -1238,7 +1236,7 @@ static int EnvEffect_set_children(PyObject *self, PyObject *value, void *closure
         PyErr_SetString(PyExc_TypeError, "children must be iterable");
         return -1;
     }
-    std::vector<std::shared_ptr<htps::theorem>> new_children;
+    std::vector<htps::TheoremPointer> new_children;
     PyObject *item;
     while ((item = PyIter_Next(iter)) != NULL) {
         if (!PyObject_TypeCheck(item, &TheoremType)) {
@@ -1561,7 +1559,7 @@ static int EnvExpansion_set_children_for_tactic(PyObject *self, PyObject *value,
         PyErr_SetString(PyExc_TypeError, "children_for_tactic must be iterable");
         return -1;
     }
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> outer;
+    std::vector<std::vector<htps::TheoremPointer>> outer;
     PyObject *item_outer;
     while ((item_outer = PyIter_Next(iter_outer)) != NULL) {
         PyObject *iter_inner = PyObject_GetIter(item_outer);
@@ -1571,7 +1569,7 @@ static int EnvExpansion_set_children_for_tactic(PyObject *self, PyObject *value,
             Py_DECREF(iter_outer);
             return -1;
         }
-        std::vector<std::shared_ptr<htps::theorem>> inner;
+        std::vector<htps::TheoremPointer> inner;
         PyObject *item_inner;
         while ((item_inner = PyIter_Next(iter_inner)) != NULL) {
             if (!PyObject_TypeCheck(item_inner, &TheoremType)) {
@@ -1753,14 +1751,14 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 Py_DECREF(item);
             }
             Py_DECREF(iter);
-            std::vector<std::vector<std::shared_ptr<htps::theorem>>> children_for_tactic;
+            std::vector<std::vector<htps::TheoremPointer>> children_for_tactic;
             iter = PyObject_GetIter(py_children);
             if (!iter) {
                 PyErr_SetString(PyExc_TypeError, "children_for_tactic must be iterable");
                 return -1;
             }
             while ((item = PyIter_Next(iter)) != NULL) {
-                std::vector<std::shared_ptr<htps::theorem>> inner;
+                std::vector<htps::TheoremPointer> inner;
                 PyObject *iter_inner = PyObject_GetIter(item);
                 if (!iter_inner) {
                     PyErr_SetString(PyExc_TypeError, "each element of children_for_tactic must be iterable");
@@ -1991,8 +1989,8 @@ static PyObject *PyHTPSSampleEffect_new(PyTypeObject *type, PyObject *args, PyOb
 
 static int PyHTPSSampleEffect_init(PyHTPSSampleEffect *self, PyObject *args, PyObject *kwds) {
     PyObject *py_goal = NULL, *py_tac = NULL, *py_children = NULL;
-    static char *kwlist[] = {"goal", "tactic", "children", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOO", kwlist, &py_goal, &py_tac, &py_children)) {
+    static const char *kwlist[] = {"goal", "tactic", "children", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOO", const_cast<char**>(kwlist), &py_goal, &py_tac, &py_children)) {
         return -1;
     }
     if (!PyObject_TypeCheck(py_goal, &TheoremType)) {
@@ -2003,10 +2001,9 @@ static int PyHTPSSampleEffect_init(PyHTPSSampleEffect *self, PyObject *args, PyO
         PyErr_SetString(PyExc_TypeError, "tactic must be a Tactic object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = ((PyTheorem *) py_goal)->cpp_obj;
-    std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(
-            std::make_shared<htps::tactic>(*(htps::tactic *) py_tac));
-    std::vector<std::shared_ptr<htps::theorem>> children;
+    htps::TheoremPointer goal = ((PyTheorem *) py_goal)->cpp_obj;
+    std::shared_ptr<htps::tactic> tac = std::make_shared<htps::tactic>((*(PyTactic *) py_tac).cpp_obj);
+    std::vector<htps::TheoremPointer> children;
     PyObject *iter = PyObject_GetIter(py_children);
     if (!iter) {
         PyErr_SetString(PyExc_TypeError, "children must be iterable");
@@ -2020,7 +2017,7 @@ static int PyHTPSSampleEffect_init(PyHTPSSampleEffect *self, PyObject *args, PyO
             Py_DECREF(iter);
             return -1;
         }
-        std::shared_ptr<htps::theorem> child = ((PyTheorem *) item)->cpp_obj;
+        htps::TheoremPointer child = ((PyTheorem *) item)->cpp_obj;
         children.push_back(child);
         Py_DECREF(item);
     }
@@ -2039,7 +2036,7 @@ static PyObject *PyHTPSSampleEffect_get_tactic(PyHTPSSampleEffect *self, void *c
 }
 
 static PyObject *PyHTPSSampleEffect_get_children(PyHTPSSampleEffect *self, void *closure) {
-    std::vector<std::shared_ptr<htps::theorem>> children = self->cpp_obj.get_children();
+    std::vector<htps::TheoremPointer> children = self->cpp_obj.get_children();
     PyObject *list = PyList_New(children.size());
     if (!list)
         return PyErr_NoMemory();
@@ -2141,7 +2138,7 @@ static int PyHTPSSampleCritic_init(PyHTPSSampleCritic *self, PyObject *args, PyO
         PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = ((PyTheorem *) py_goal)->cpp_obj;
+    htps::TheoremPointer goal = ((PyTheorem *) py_goal)->cpp_obj;
     self->cpp_obj.~HTPSSampleCritic();
     new(&self->cpp_obj) htps::HTPSSampleCritic(goal, q_estimate, solved ? true : false, bad ? true : false, critic,
                                                visit_count);
@@ -2272,7 +2269,7 @@ static int PyHTPSSampleTactics_init(PyHTPSSampleTactics *self, PyObject *args, P
         PyErr_SetString(PyExc_TypeError, "goal must be a Theorem object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> goal = ((PyTheorem *) py_goal)->cpp_obj;
+    htps::TheoremPointer goal = ((PyTheorem *) py_goal)->cpp_obj;
 
     std::vector<std::shared_ptr<htps::tactic>> tactics;
     PyObject *iter = PyObject_GetIter(py_tactics);
@@ -2288,8 +2285,7 @@ static int PyHTPSSampleTactics_init(PyHTPSSampleTactics *self, PyObject *args, P
             Py_DECREF(iter);
             return -1;
         }
-        std::shared_ptr<htps::tactic> tac = std::static_pointer_cast<htps::tactic>(
-                std::make_shared<htps::tactic>(*(htps::tactic *) item));
+        auto tac =std::make_shared<htps::tactic>((*(PyTactic *) item).cpp_obj);
         tactics.push_back(tac);
         Py_DECREF(item);
     }
@@ -2502,9 +2498,8 @@ static int PyProof_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         PyErr_SetString(PyExc_TypeError, "tactic must be a Tactic object");
         return -1;
     }
-    std::shared_ptr<htps::theorem> proof_theorem = ((PyTheorem *) py_thm)->cpp_obj;
-    std::shared_ptr<htps::tactic> proof_tactic = std::static_pointer_cast<htps::tactic>(
-            std::make_shared<htps::tactic>(*(htps::tactic *) py_tactic));
+    htps::TheoremPointer proof_theorem = ((PyTheorem *) py_thm)->cpp_obj;
+    std::shared_ptr<htps::tactic> proof_tactic = std::make_shared<htps::tactic>((*(PyTactic *) py_tactic).cpp_obj);
 
     std::vector<htps::proof> children;
     PyObject *iter = PyObject_GetIter(py_children);
@@ -3091,7 +3086,7 @@ static int HTPS_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 }
 
 static PyObject *PyHTPS_theorems_to_expand(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
-    std::vector<std::shared_ptr<htps::theorem>> thms;
+    std::vector<htps::TheoremPointer> thms;
     try {
         thms = self->graph.theorems_to_expand();
     } catch (std::exception &e) {
@@ -3268,7 +3263,6 @@ static PyTypeObject HTPSType = {
 };
 
 
-extern "C"
 PyMODINIT_FUNC
 PyInit_htps(void) {
     PyObject *m = PyModule_Create(&htps_module);

@@ -228,10 +228,10 @@ namespace htps {
 
 
     protected:
-        std::shared_ptr<theorem> thm;
+        TheoremPointer thm;
         std::vector<std::shared_ptr<tactic>> tactics;
         std::vector<bool> tactic_expandable;
-        std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+        std::vector<std::vector<TheoremPointer>> children_for_tactic;
         std::unordered_set<size_t> killed_tactics;
         std::unordered_set<size_t> solving_tactics;
         MinimumLengthMap minimum_proof_size;
@@ -262,8 +262,8 @@ namespace htps {
             return *thm == *n.thm;
         }
 
-        Node(const std::shared_ptr<theorem> &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
-             const std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic) :
+        Node(const TheoremPointer &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
+             const std::vector<std::vector<TheoremPointer>> &children_for_tactic) :
                 thm(thm),
                 tactics(tactics),
                 tactic_expandable(tactics.size(), true),
@@ -348,30 +348,30 @@ namespace htps {
             return is_solved_leaf;
         }
 
-        std::shared_ptr<theorem> get_theorem() const {
+        TheoremPointer get_theorem() const {
             return thm;
         }
 
-        std::vector<std::shared_ptr<theorem>> get_children_for_tactic(size_t i) const {
+        std::vector<TheoremPointer> get_children_for_tactic(size_t i) const {
             if (i >= children_for_tactic.size()) {
                 throw std::invalid_argument("Invalid tactic");
             }
             return children_for_tactic[i];
         }
 
-        std::vector<std::shared_ptr<theorem>> &get_children_for_tactic(size_t i) {
+        std::vector<TheoremPointer> &get_children_for_tactic(size_t i) {
             if (i >= children_for_tactic.size()) {
                 throw std::invalid_argument("Invalid tactic");
             }
             return children_for_tactic[i];
         }
 
-        std::vector<std::vector<std::shared_ptr<theorem>>> get_children_for_tactic() const {
+        std::vector<std::vector<TheoremPointer>> get_children_for_tactic() const {
             return children_for_tactic;
         }
 
 
-        std::vector<std::vector<std::shared_ptr<theorem>>> &get_children_for_tactic() {
+        std::vector<std::vector<TheoremPointer>> &get_children_for_tactic() {
             return children_for_tactic;
         }
 
@@ -503,17 +503,17 @@ namespace htps {
 
         static Node from_json(const nlohmann::json &j) {
             Node n;
-            n.thm = std::make_shared<theorem>(theorem::from_json(j["theorem"]));
+            n.thm = j["theorem"];
             std::vector<std::shared_ptr<tactic>> tactics;
             for (const auto &tac: j["tactics"]) {
-                tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+                tactics.push_back(tac);
             }
             n.tactics = tactics;
-            std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+            std::vector<std::vector<TheoremPointer>> children_for_tactic;
             for (const auto &children: j["children_for_tactic"]) {
-                std::vector<std::shared_ptr<theorem>> children_for_tactic_inner;
+                std::vector<TheoremPointer> children_for_tactic_inner;
                 for (const auto &child: children) {
-                    children_for_tactic_inner.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+                    children_for_tactic_inner.push_back(child);
                 }
                 children_for_tactic.push_back(children_for_tactic_inner);
             }
@@ -587,7 +587,7 @@ namespace htps {
             return contains(thm.unique_string);
         }
 
-        bool contains(const std::shared_ptr<theorem> &thm) const {
+        bool contains(const TheoremPointer &thm) const {
             return contains(*thm);
         }
 
@@ -599,7 +599,7 @@ namespace htps {
             insert(thm.unique_string);
         }
 
-        void insert(const std::shared_ptr<theorem> &thm) {
+        void insert(const TheoremPointer &thm) {
             insert(*thm);
         }
 
@@ -611,7 +611,7 @@ namespace htps {
             return erase(thm.unique_string);
         }
 
-        bool erase(const std::shared_ptr<theorem> &thm) {
+        bool erase(const TheoremPointer &thm) {
             return erase(*thm);
         }
 
@@ -627,7 +627,7 @@ namespace htps {
             return find(thm.unique_string);
         }
 
-        auto find(const std::shared_ptr<theorem> &thm) const {
+        auto find(const TheoremPointer &thm) const {
             return find(*thm);
         }
 
@@ -696,7 +696,7 @@ namespace htps {
             return contains(thm.unique_string, t);
         }
 
-        bool contains(const std::shared_ptr<theorem> &thm, const T &t) const {
+        bool contains(const TheoremPointer &thm, const T &t) const {
             if (!thm)
                 return contains("", t);
             return contains(*thm, t);
@@ -710,7 +710,7 @@ namespace htps {
             insert(thm.unique_string, t);
         }
 
-        void insert(const std::shared_ptr<theorem> &thm, const T &t) {
+        void insert(const TheoremPointer &thm, const T &t) {
             if (!thm)
                 return insert("", t);
             insert(*thm, t);
@@ -724,7 +724,7 @@ namespace htps {
             return erase(thm.unique_string, t);
         }
 
-        bool erase(const std::shared_ptr<theorem> &thm, const T &t) {
+        bool erase(const TheoremPointer &thm, const T &t) {
             if (!thm)
                 return erase("", t);
             return erase(*thm, t);
@@ -791,7 +791,7 @@ namespace htps {
             return contains(thm.unique_string);
         }
 
-        bool contains(const std::shared_ptr<theorem> &thm) const {
+        bool contains(const TheoremPointer &thm) const {
             return contains(*thm);
         }
 
@@ -803,7 +803,7 @@ namespace htps {
             return at(thm.unique_string);
         }
 
-        T &at(const std::shared_ptr<theorem> &thm) {
+        T &at(const TheoremPointer &thm) {
             return at(*thm);
         }
 
@@ -815,7 +815,7 @@ namespace htps {
             return at(thm.unique_string);
         }
 
-        T at(const std::shared_ptr<theorem> &thm) const {
+        T at(const TheoremPointer &thm) const {
             return at(*thm);
         }
 
@@ -827,7 +827,7 @@ namespace htps {
             return insert(thm.unique_string, t);
         }
 
-        auto insert(const std::shared_ptr<theorem> &thm, const T &t) {
+        auto insert(const TheoremPointer &thm, const T &t) {
             return insert(*thm, t);
         }
 
@@ -839,7 +839,7 @@ namespace htps {
             return insert_or_assign(thm.unique_string, t);
         }
 
-        auto insert_or_assign(const std::shared_ptr<theorem> &thm, const T &t) {
+        auto insert_or_assign(const TheoremPointer &thm, const T &t) {
             return insert_or_assign(*thm, t);
         }
 
@@ -851,7 +851,7 @@ namespace htps {
             return erase(thm.unique_string);
         }
 
-        bool erase(const std::shared_ptr<theorem> &thm) {
+        bool erase(const TheoremPointer &thm) {
             return erase(*thm);
         }
 
@@ -867,7 +867,7 @@ namespace htps {
             return find(thm.unique_string);
         }
 
-        auto find(const std::shared_ptr<theorem> &thm) const {
+        auto find(const TheoremPointer &thm) const {
             return find(*thm);
         }
 
@@ -879,7 +879,7 @@ namespace htps {
             set(thm.unique_string, t);
         }
 
-        void set(const std::shared_ptr<theorem> &thm, const T &t) {
+        void set(const TheoremPointer &thm, const T &t) {
             set(*thm, t);
         }
 
@@ -918,7 +918,7 @@ namespace htps {
 
         // Add an ancestor relationship
         void
-        add_ancestor(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        add_ancestor(const TheoremPointer &thm, const TheoremPointer &parent, size_t tactic_id) {
             if (!contains(thm)) {
                 insert(thm, AncestorSet());
             }
@@ -936,7 +936,7 @@ namespace htps {
             return get_ancestors(thm.unique_string);
         }
 
-        const AncestorSet &get_ancestors(const std::shared_ptr<theorem> &thm) {
+        const AncestorSet &get_ancestors(const TheoremPointer &thm) {
             return get_ancestors(*thm);
         }
 
@@ -950,7 +950,7 @@ namespace htps {
             return get_ancestors(thm.unique_string);
         }
 
-        const AncestorSet get_ancestors(const std::shared_ptr<theorem> &thm) const {
+        const AncestorSet get_ancestors(const TheoremPointer &thm) const {
             return get_ancestors(*thm);
         }
 
@@ -966,18 +966,18 @@ namespace htps {
             }
         }
 
-        bool contains(const std::string &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        bool contains(const std::string &thm, const TheoremPointer &parent, size_t tactic_id) {
             if (!contains(thm)) {
                 return false;
             }
             return get_ancestors(thm).contains(parent, tactic_id);
         }
 
-        bool contains(const theorem &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        bool contains(const theorem &thm, const TheoremPointer &parent, size_t tactic_id) {
             return contains(thm.unique_string, parent, tactic_id);
         }
 
-        bool contains(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        bool contains(const TheoremPointer &thm, const TheoremPointer &parent, size_t tactic_id) {
             return contains(*thm, parent, tactic_id);
         }
 
@@ -989,18 +989,18 @@ namespace htps {
             return size(thm.unique_string);
         }
 
-        size_t size(const std::shared_ptr<theorem> &thm) const {
+        size_t size(const TheoremPointer &thm) const {
             return size(*thm);
         }
 
-        bool erase(const theorem &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        bool erase(const theorem &thm, const TheoremPointer &parent, size_t tactic_id) {
             if (!contains(thm)) {
                 return false;
             }
             return at(thm).erase(parent, tactic_id);
         }
 
-        bool erase(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t tactic_id) {
+        bool erase(const TheoremPointer &thm, const TheoremPointer &parent, size_t tactic_id) {
             return erase(*thm, parent, tactic_id);
         }
 
@@ -1017,7 +1017,7 @@ namespace htps {
     template<typename T, typename PT>
     class Graph {
     protected:
-        std::shared_ptr<theorem> root;
+        TheoremPointer root;
         TheoremMap<std::shared_ptr<T>> nodes;
         AncestorsMap ancestors;
         AncestorsMap permanent_ancestors;
@@ -1026,7 +1026,7 @@ namespace htps {
         MinimumLengthMap initial_minimum_proof_size;
 
     public:
-        explicit Graph(std::shared_ptr<theorem> &root) : root(root), nodes(), ancestors(), permanent_ancestors(),
+        explicit Graph(TheoremPointer &root) : root(root), nodes(), ancestors(), permanent_ancestors(),
                                                          unexplored_theorems(),
                                                          minimum_proof_size(), initial_minimum_proof_size() {
             ancestors.add_ancestor(root, nullptr, 0);
@@ -1050,7 +1050,7 @@ namespace htps {
 
         static Graph from_json(const nlohmann::json &j) {
             Graph g;
-            g.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
+            g.root =j["root"];
             g.nodes = TheoremMap<std::shared_ptr<T>>::from_json(j["nodes"]);
             g.ancestors = AncestorsMap::from_json(j["ancestors"]);
             g.permanent_ancestors = AncestorsMap::from_json(j["permanent_ancestors"]);
@@ -1079,7 +1079,7 @@ namespace htps {
             std::vector<std::shared_ptr<T>> to_check_solved;
             std::vector<std::shared_ptr<T>> newly_solved;
             for (auto &node: node_list) {
-                std::shared_ptr<theorem> th = node.get_theorem();
+                TheoremPointer th = node.get_theorem();
                 if (!ancestors.contains(th) || !permanent_ancestors.contains(th)) {
                     throw std::invalid_argument("Invalid node");
                 }
@@ -1126,7 +1126,7 @@ namespace htps {
 
         void kill_tactic(std::shared_ptr<T> node, size_t tactic_id) {
             std::deque<std::pair<std::shared_ptr<T>, size_t>> to_kill;
-            std::shared_ptr<theorem> thm;
+            TheoremPointer thm;
             to_kill.push_back({node, tactic_id});
             while (!to_kill.empty()) {
                 auto [current, tid] = to_kill.front();
@@ -1178,7 +1178,7 @@ namespace htps {
                 if (current->is_solved() && ignore_solved) {
                     continue;
                 }
-                std::vector<std::vector<std::shared_ptr<theorem>>> children = current->get_children_for_tactic();
+                std::vector<std::vector<TheoremPointer>> children = current->get_children_for_tactic();
                 for (size_t i = 0; i < children.size(); i++) {
                     if (current->killed(i)) {
                         continue;
@@ -1300,7 +1300,7 @@ namespace htps {
                     continue;
                 }
                 auto children = current->get_children_for_tactic(tid);
-                if (std::all_of(children.begin(), children.end(), [this](std::shared_ptr<theorem> &thm) {
+                if (std::all_of(children.begin(), children.end(), [this](TheoremPointer &thm) {
                     return nodes.contains(thm) && nodes.at(thm)->is_solved();
                 })) {
                     if (current->solved_by(tid))
@@ -1337,7 +1337,7 @@ namespace htps {
                 const auto &children_for_tactic = node->get_children_for_tactic();
                 for (size_t tactic_id = 0; tactic_id < children_for_tactic.size(); tactic_id++) {
                     const auto &children = children_for_tactic[tactic_id];
-                    should_be_solved |= std::all_of(children.begin(), children.end(), [this](const std::shared_ptr<theorem> &thm) {
+                    should_be_solved |= std::all_of(children.begin(), children.end(), [this](const TheoremPointer &thm) {
                         return nodes.contains(thm) && nodes.at(thm)->is_solved();
                     }) && node->is_valid(tactic_id);
                 }
@@ -1356,10 +1356,10 @@ namespace htps {
                 return;
             }
             TheoremSet seen;
-            std::deque<std::shared_ptr<theorem>> to_visit;
+            std::deque<TheoremPointer> to_visit;
             to_visit.push_back(root);
             while (!to_visit.empty()) {
-                std::shared_ptr<theorem> current = to_visit.front();
+                TheoremPointer current = to_visit.front();
                 to_visit.pop_front();
                 if (!nodes.contains(current)) {
                     continue;
@@ -1378,7 +1378,7 @@ namespace htps {
         }
 
         // Get all proofs for a theorem
-        std::vector<struct proof> all_proofs(std::shared_ptr<theorem> &thm) {
+        std::vector<struct proof> all_proofs(TheoremPointer &thm) {
             T node = nodes.at(thm);
             if (!node.is_solved()) {
                 throw std::invalid_argument("Theorem not solved");
@@ -1395,7 +1395,7 @@ namespace htps {
             }
         }
 
-        struct proof minimal_proof(Metric metric, const std::shared_ptr<theorem> &thm) const {
+        struct proof minimal_proof(Metric metric, const TheoremPointer &thm) const {
             if (!nodes.contains(thm)) {
                 throw std::invalid_argument("Theorem not found");
             }
@@ -1488,11 +1488,11 @@ namespace htps {
                 assert(nodes.contains(root));
                 assert(nodes.at(root)->minimum_length(metric) < MAXIMUM_PROOF_LENGTH);
                 minimum_proof_size.set(metric, nodes.at(root)->minimum_length(metric));
-                std::deque<std::shared_ptr<theorem>> to_visit;
+                std::deque<TheoremPointer> to_visit;
                 to_visit.push_back(root);
                 TheoremSet seen;
                 while (!to_visit.empty()) {
-                    std::shared_ptr<theorem> current = to_visit.front();
+                    TheoremPointer current = to_visit.front();
                     to_visit.pop_front();
                     if (seen.contains(*current)) {
                         continue;
@@ -1514,7 +1514,7 @@ namespace htps {
 
 
     protected:
-        size_t depth_for_children(const std::vector<std::shared_ptr<theorem>> &children) const {
+        size_t depth_for_children(const std::vector<TheoremPointer> &children) const {
             size_t base = 0;
             for (const auto &child: children) {
                 if (!nodes.contains(child)) {
@@ -1526,7 +1526,7 @@ namespace htps {
             return base;
         }
 
-        size_t size_for_children(const std::vector<std::shared_ptr<theorem>> &children) const {
+        size_t size_for_children(const std::vector<TheoremPointer> &children) const {
             size_t base = 0;
             for (const auto &child: children) {
                 // Overflow protection, otherwise we might add MAXIMUM_PROOF_LENGTH twice, which will overflow
@@ -1542,7 +1542,7 @@ namespace htps {
             return base;
         }
 
-        size_t time_for_children(const std::vector<std::shared_ptr<theorem>> &children) const {
+        size_t time_for_children(const std::vector<TheoremPointer> &children) const {
             size_t base = 0;
             for (const auto &child: children) {
                 // Overflow protection, otherwise we might add MAXIMUM_PROOF_LENGTH twice, which will overflow

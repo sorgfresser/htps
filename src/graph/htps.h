@@ -22,8 +22,6 @@
 
 namespace htps {
 
-    constexpr double SOLVED_LOG_VALUE = 0.0; // e(0) = 1
-
     size_t get_seed();
     std::mt19937 setup_gen();
 
@@ -33,29 +31,29 @@ namespace htps {
 
     class HTPSSampleEffect {
     private:
-        std::shared_ptr<theorem> goal;
+        TheoremPointer goal;
         std::shared_ptr<tactic> tac;
-        std::vector<std::shared_ptr<theorem>> children;
+        std::vector<TheoremPointer> children;
     public:
-        HTPSSampleEffect(const std::shared_ptr<theorem> &goal, const std::shared_ptr<tactic> &tac,
-                         const std::vector<std::shared_ptr<theorem>> &children) : goal(goal),
+        HTPSSampleEffect(const TheoremPointer &goal, const std::shared_ptr<tactic> &tac,
+                         const std::vector<TheoremPointer> &children) : goal(goal),
                                                                                   tac(tac),
                                                                                   children(children) {}
 
         HTPSSampleEffect() = default;
 
-        std::shared_ptr<theorem> get_goal() const;
+        TheoremPointer get_goal() const;
 
         std::shared_ptr<tactic> get_tactic() const;
 
-        void get_children(std::vector<std::shared_ptr<theorem>> &children) const;
+        void get_children(std::vector<TheoremPointer> &children) const;
 
-        std::vector<std::shared_ptr<theorem>> get_children() const;
+        std::vector<TheoremPointer> get_children() const;
     };
 
     class HTPSSampleCritic {
     private:
-        std::shared_ptr<theorem> goal;
+        TheoremPointer goal;
         double q_estimate{};
         bool solved{};
         bool bad{};
@@ -63,7 +61,7 @@ namespace htps {
         size_t visit_count{};
 
     public:
-        HTPSSampleCritic(std::shared_ptr<theorem> goal, double q_estimate, bool solved, bool bad, double critic,
+        HTPSSampleCritic(TheoremPointer goal, double q_estimate, bool solved, bool bad, double critic,
                          size_t visit_count) :
                 goal(std::move(goal)), q_estimate(q_estimate), solved(solved), bad(bad), critic(critic),
                 visit_count(visit_count) {
@@ -73,7 +71,7 @@ namespace htps {
 
         HTPSSampleCritic() = default;
 
-        std::shared_ptr<theorem> get_goal() const {
+        TheoremPointer get_goal() const {
             return goal;
         }
 
@@ -107,7 +105,7 @@ namespace htps {
 
     class HTPSSampleTactics {
     private:
-        std::shared_ptr<theorem> goal;
+        TheoremPointer goal;
         std::vector<std::shared_ptr<tactic>> tactics;
         std::vector<double> target_pi;
         enum InProof inproof;
@@ -115,7 +113,7 @@ namespace htps {
         size_t visit_count;
 
     public:
-        HTPSSampleTactics(std::shared_ptr<theorem> goal, const std::vector<std::shared_ptr<tactic>> &tactics,
+        HTPSSampleTactics(TheoremPointer goal, const std::vector<std::shared_ptr<tactic>> &tactics,
                           const std::vector<double> &target_pi, enum InProof inproof,
                           const std::vector<double> &q_estimates,
                           size_t visit_count) :
@@ -130,7 +128,7 @@ namespace htps {
 
         HTPSSampleTactics() = default;
 
-        std::shared_ptr<theorem> get_goal() const {
+        TheoremPointer get_goal() const {
             return goal;
         }
 
@@ -213,24 +211,24 @@ namespace htps {
     // A single simulation of the HTPS algorithm
     class Simulation {
     private:
-        TheoremMap<std::shared_ptr<theorem>> theorems;
+        TheoremMap<TheoremPointer> theorems;
         TheoremMap<size_t> tactic_ids;
         TheoremMap<std::shared_ptr<tactic>> tactics;
         TheoremMap<size_t> depth;
-        TheoremMap<std::vector<std::shared_ptr<theorem>>> children_for_theorem;
-        TheoremMap<std::shared_ptr<theorem>> parent_for_theorem;
+        TheoremMap<std::vector<TheoremPointer>> children_for_theorem;
+        TheoremMap<TheoremPointer> parent_for_theorem;
         TheoremMap<double> values;
         TheoremMap<bool> solved;
         TheoremMap<bool> virtual_count_added;
         TheoremMap<TheoremSet> seen; // Seen theorems, we immediately free the memory since this can get large
-        std::shared_ptr<theorem> root;
+        TheoremPointer root;
         size_t expansions; // Number of expansions currently awaiting. If it reaches 0, values should be backed up
 
         friend struct std::hash<Simulation>;
     public:
-        std::vector<std::shared_ptr<theorem>> leaves() const;
+        std::vector<TheoremPointer> leaves() const;
 
-        void leaves(std::vector<std::shared_ptr<theorem>> &leaves) const;
+        void leaves(std::vector<TheoremPointer> &leaves) const;
 
         size_t leave_count() const;
 
@@ -238,7 +236,7 @@ namespace htps {
          * same order for all theorems, while using the same tactics. */
         bool operator==(const Simulation &other) const;
 
-        explicit Simulation(std::shared_ptr<theorem> &root)
+        explicit Simulation(TheoremPointer &root)
                 : theorems(), tactic_ids(), tactics(), depth(), children_for_theorem(), parent_for_theorem(),
                   values(), solved(), virtual_count_added(), seen(), root(root), expansions(0) {
             theorems.insert(root, root);
@@ -253,41 +251,41 @@ namespace htps {
 
         Simulation() = default;
 
-        void set_depth(const std::shared_ptr<theorem> &thm, size_t d);
+        void set_depth(const TheoremPointer &thm, size_t d);
 
-        size_t get_depth(const std::shared_ptr<theorem> &thm) const;
+        size_t get_depth(const TheoremPointer &thm) const;
 
-        bool has_depth(const std::shared_ptr<theorem> &thm) const;
+        bool has_depth(const TheoremPointer &thm) const;
 
-        void update_depth(const std::shared_ptr<theorem> &thm, size_t d);
+        void update_depth(const TheoremPointer &thm, size_t d);
 
-        void set_value(const std::shared_ptr<theorem> &thm, double v);
+        void set_value(const TheoremPointer &thm, double v);
 
-        double get_value(const std::shared_ptr<theorem> &thm) const;
+        double get_value(const TheoremPointer &thm) const;
 
-        bool is_solved(const std::shared_ptr<theorem> &thm) const;
+        bool is_solved(const TheoremPointer &thm) const;
 
-        void set_solved(const std::shared_ptr<theorem> &thm, bool s);
+        void set_solved(const TheoremPointer &thm, bool s);
 
-        void set_tactic(const std::shared_ptr<theorem> &thm, const std::shared_ptr<tactic> &tac);
+        void set_tactic(const TheoremPointer &thm, const std::shared_ptr<tactic> &tac);
 
-        std::shared_ptr<tactic> get_tactic(const std::shared_ptr<theorem> &thm) const;
+        std::shared_ptr<tactic> get_tactic(const TheoremPointer &thm) const;
 
-        void set_tactic_id(const std::shared_ptr<theorem> &thm, size_t id);
+        void set_tactic_id(const TheoremPointer &thm, size_t id);
 
-        size_t get_tactic_id(const std::shared_ptr<theorem> &thm) const;
+        size_t get_tactic_id(const TheoremPointer &thm) const;
 
-        void set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet &set);
+        void set_theorem_set(const TheoremPointer &thm, TheoremSet &set);
 
-        void set_theorem_set(const std::shared_ptr<theorem> &thm, TheoremSet set);
+        void set_theorem_set(const TheoremPointer &thm, TheoremSet set);
 
-        TheoremSet &get_theorem_set(const std::shared_ptr<theorem> &thm);
+        TheoremSet &get_theorem_set(const TheoremPointer &thm);
 
-        void add_theorem(const std::shared_ptr<theorem> &thm, const std::shared_ptr<theorem> &parent, size_t thm_depth);
+        void add_theorem(const TheoremPointer &thm, const TheoremPointer &parent, size_t thm_depth);
 
-        bool erase_theorem_set(const std::shared_ptr<theorem> &thm);
+        bool erase_theorem_set(const TheoremPointer &thm);
 
-        void receive_expansion(const std::shared_ptr<theorem> &thm, double value, bool solved);
+        void receive_expansion(const TheoremPointer &thm, double value, bool solved);
 
         auto begin() const {
             return theorems.begin();
@@ -297,17 +295,17 @@ namespace htps {
             return theorems.end();
         }
 
-        std::vector<std::shared_ptr<theorem>> get_children(const std::shared_ptr<theorem> &thm) const;
+        std::vector<TheoremPointer> get_children(const TheoremPointer &thm) const;
 
-        bool get_virtual_count_added(const std::shared_ptr<theorem> &thm) const;
+        bool get_virtual_count_added(const TheoremPointer &thm) const;
 
-        void set_virtual_count_added(const std::shared_ptr<theorem> &thm, bool value);
+        void set_virtual_count_added(const TheoremPointer &thm, bool value);
 
         bool should_backup() const;
 
-        std::shared_ptr<theorem> parent(const std::shared_ptr<theorem> &thm) const;
+        TheoremPointer parent(const TheoremPointer &thm) const;
 
-        std::vector<double> child_values(const std::shared_ptr<theorem> &thm) const;
+        std::vector<double> child_values(const TheoremPointer &thm) const;
 
         void reset_expansions();
 
@@ -319,7 +317,7 @@ namespace htps {
 
         static Simulation from_json(const nlohmann::json &j);
 
-        void deduplicate(const std::shared_ptr<theorem> &ptr);
+        void deduplicate(const TheoremPointer &ptr);
     };
 }
 
@@ -382,13 +380,12 @@ namespace htps {
         bool _validate() const;
 
     public:
-        HTPSNode(const std::shared_ptr<theorem> &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
-                 const std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic,
+        HTPSNode(const TheoremPointer &thm, const std::vector<std::shared_ptr<tactic>> &tactics,
+                 const std::vector<std::vector<TheoremPointer>> &children_for_tactic,
                  const std::shared_ptr<Policy> &policy, const std::vector<double> &priors,
                  const double exploration, const double log_critic_value, const QValueSolved q_value_solved,
                  const double tactic_init_value,
-                 const std::vector<std::shared_ptr<env_effect>> &effects,
-                 const size_t seed = 42) :
+                 const std::vector<std::shared_ptr<env_effect>> &effects) :
                 Node(thm, tactics, children_for_tactic), old_critic_value(0.0), log_critic_value(log_critic_value),
                 priors(priors), q_value_solved(q_value_solved), effects(effects), policy(policy), exploration(exploration),
                 tactic_init_value(tactic_init_value), log_w(tactics.size()), counts(), virtual_counts(),
@@ -470,12 +467,12 @@ namespace htps {
         std::vector<HTPSSampleEffect> samples_effect;
         Metric metric;
         std::vector<HTPSSampleTactics> proof_samples_tactics;
-        std::shared_ptr<theorem> goal;
+        TheoremPointer goal;
         struct proof p;
     public:
         HTPSResult(std::vector<HTPSSampleCritic> &samples_critic, std::vector<HTPSSampleTactics> &samples_tactic,
                    std::vector<HTPSSampleEffect> &samples_effect, Metric metric,
-                   std::vector<HTPSSampleTactics> &proof_samples_tactics, std::shared_ptr<theorem> &goal,
+                   std::vector<HTPSSampleTactics> &proof_samples_tactics, TheoremPointer &goal,
                    struct proof &p) :
                 samples_critic(samples_critic), samples_tactic(samples_tactic), samples_effect(samples_effect),
                 metric(metric), proof_samples_tactics(proof_samples_tactics), goal(goal),
@@ -485,7 +482,7 @@ namespace htps {
 
         struct proof get_proof() const;
 
-        std::shared_ptr<theorem> get_goal() const;
+        TheoremPointer get_goal() const;
 
         Metric get_metric() const;
 
@@ -534,8 +531,8 @@ namespace htps {
         bool propagate_needed; // Whether propagation is required. Is set to true whenever find_to_expand fails
         bool done;
 
-        void _single_to_expand(std::vector<std::shared_ptr<theorem>> &theorems, Simulation &sim,
-                               std::vector<std::shared_ptr<theorem>> &leaves_to_expand);
+        void _single_to_expand(std::vector<TheoremPointer> &theorems, Simulation &sim,
+                               std::vector<TheoremPointer> &leaves_to_expand);
 
     protected:
         bool is_leaf(const std::shared_ptr<HTPSNode> &node) const;
@@ -544,7 +541,7 @@ namespace htps {
          * For this, the value is set in each Simulation that still has the theorem in its
          *
          * */
-        void receive_expansion(std::shared_ptr<theorem> &thm, double value, bool solved);
+        void receive_expansion(TheoremPointer &thm, double value, bool solved);
 
         void expand(std::vector<std::shared_ptr<env_expansion>> &expansions);
 
@@ -552,19 +549,19 @@ namespace htps {
 
         void backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value);
 
-        std::vector<std::shared_ptr<theorem>> batch_to_expand();
+        std::vector<TheoremPointer> batch_to_expand();
 
-        void batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
+        void batch_to_expand(std::vector<TheoremPointer> &theorems);
 
         void cleanup(Simulation &to_clean);
 
     public:
-        HTPS(std::shared_ptr<theorem> &root, const htps_params &params, std::shared_ptr<Policy> &policy) :
+        HTPS(TheoremPointer &root, const htps_params &params, std::shared_ptr<Policy> &policy) :
                 Graph<HTPSNode, PrioritizedNode>(root), policy(policy), params(params), expansion_count(0),
                 train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
                 currently_expanding(), propagate_needed(true), done(false) {};
 
-        HTPS(std::shared_ptr<theorem> &root, const htps_params &params) :
+        HTPS(TheoremPointer &root, const htps_params &params) :
             Graph<HTPSNode, PrioritizedNode>(root), params(params), expansion_count(0),
                 train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
                 currently_expanding(), propagate_needed(true), done(false) {
@@ -575,7 +572,7 @@ namespace htps {
                 train_samples_effects(), train_samples_critic(), train_samples_tactics(), backedup_hashes(),
                 currently_expanding(), propagate_needed(true), done(false) {};
 
-        void set_root(std::shared_ptr<theorem> &thm);
+        void set_root(TheoremPointer &thm);
 
         void set_params(const htps_params &new_params);
 
@@ -593,14 +590,14 @@ namespace htps {
 
         bool is_done() const;
 
-        Simulation find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &terminal,
-                                         std::vector<std::shared_ptr<theorem>> &to_expand);
+        Simulation find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
+                                         std::vector<TheoremPointer> &to_expand);
 
         void expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions);
 
-        std::vector<std::shared_ptr<theorem>> theorems_to_expand();
+        std::vector<TheoremPointer> theorems_to_expand();
 
-        void theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
+        void theorems_to_expand(std::vector<TheoremPointer> &theorems);
 
         HTPSResult get_result();
 

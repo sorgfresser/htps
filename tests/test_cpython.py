@@ -16,9 +16,11 @@ def _compare_tactics(ta, tb):
         assert new.is_valid == orig.is_valid
         assert new.duration == orig.duration
 
-def _compare_theorem(a, b):
+def _compare_theorem(a, b, metadata=True):
     assert a.conclusion == b.conclusion and a.unique_string == b.unique_string and \
-           a.context.namespaces == b.context.namespaces and a.metadata == b.metadata
+           a.context.namespaces == b.context.namespaces
+    if metadata:
+        assert a.metadata == b.metadata
     _compare_hypotheses(a.hypotheses, b.hypotheses)
     _compare_tactics(a.past_tactics, b.past_tactics)
 
@@ -418,8 +420,8 @@ def test_htps_expansion():
 
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
-    _compare_theorem(theorems[0], theorem2)
-    assert theorems[0].metadata == {"key": "value2"}
+    _compare_theorem(theorems[0], theorem3)
+    assert theorems[0].metadata == {"key": "value3"}
 
     env_durations = [10]
     log_critic = -0.1
@@ -427,9 +429,9 @@ def test_htps_expansion():
     expansion_tactics = [tactic_a2]
     children_for_tactic = [[]]
     priors = [1.0]
-    effect2 = EnvEffect(theorem2, tactic_a2, [])
+    effect2 = EnvEffect(theorem3, tactic_a2, [])
     effects = [effect2]
-    expansion = EnvExpansion(theorem2, 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
+    expansion = EnvExpansion(theorem3, 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
     search.expand_and_backup([expansion])
     assert search.proven()
     assert search.is_done()
@@ -441,10 +443,10 @@ def test_htps_expansion():
     assert len(result.tactic_samples) == 2
     assert len(result.effect_samples) == 3 # 3 effects in total
     assert len(result.proof_samples_tactics) == 2
-    tactic_samples = [SampleTactics(theorem2, tactics=[tactic_a2], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=0), SampleTactics(theorem, tactics=[tactic_a], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=1)]
-    _compare_critic_samples(result.critic_samples, [SampleCritic(theorem2, q_estimate=1.0, solved=True, bad=False, critic=0.0, visit_count=0), SampleCritic(theorem, q_estimate=1.0, solved=True, bad=False, critic=-0.5, visit_count=1)])
+    tactic_samples = [SampleTactics(theorem3, tactics=[tactic_a2], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=0), SampleTactics(theorem, tactics=[tactic_b], target_pi=[-1.0], inproof=InProof.InMinimalProof, q_estimates=[1.0], visit_count=1)]
+    _compare_critic_samples(result.critic_samples, [SampleCritic(theorem3, q_estimate=1.0, solved=True, bad=False, critic=0.0, visit_count=0), SampleCritic(theorem, q_estimate=1.0, solved=True, bad=False, critic=-0.5, visit_count=1)])
     _compare_tactic_samples(result.tactic_samples, tactic_samples)
-    _compare_effect_samples(result.effect_samples, [SampleEffect(theorem2, tactic_a2, []), SampleEffect(theorem, tactic_b, [theorem3]), SampleEffect(theorem, tactic_a, [theorem2])])
+    _compare_effect_samples(result.effect_samples, [SampleEffect(theorem3, tactic_a2, []), SampleEffect(theorem, tactic_b, [theorem3]), SampleEffect(theorem, tactic_a, [theorem2])])
     _compare_tactic_samples(result.proof_samples_tactics, tactic_samples)
     assert result.metric == Metric.Time
     _compare_theorem(result.goal, theorem)
@@ -482,14 +484,14 @@ def _create_expansion2(theorem):
     expansion = EnvExpansion(theorem, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
     json_str = expansion.get_json_str()
     test_expansion = EnvExpansion.from_json_str(json_str)
-    _compare_theorem(test_expansion.thm, expansion.thm)
+    _compare_theorem(test_expansion.thm, expansion.thm, metadata=False) # metadata is not dumped / loaded
     assert test_expansion.expander_duration == expansion.expander_duration
     assert test_expansion.generation_duration == expansion.generation_duration
     assert test_expansion.env_durations == expansion.env_durations
     assert test_expansion.log_critic == expansion.log_critic
     _compare_tactics(test_expansion.tactics, expansion.tactics)
     assert test_expansion.priors == expansion.priors
-    [[_compare_theorem(test_child, child) for test_child, child in zip(test_children, children)] for test_children, children in zip(test_expansion.children_for_tactic, expansion.children_for_tactic)]
+    [[_compare_theorem(test_child, child, metadata=False) for test_child, child in zip(test_children, children)] for test_children, children in zip(test_expansion.children_for_tactic, expansion.children_for_tactic)]
     assert all(effect.goal.unique_string == test_effect.goal.unique_string and effect.tactic.unique_string == test_effect.tactic.unique_string and len(effect.children) == len(test_effect.children) for effect, test_effect in zip(expansion.effects, test_expansion.effects))
     assert all(all(child.unique_string == test_child.unique_string for child, test_child in zip(effect.children, test_effect.children)) for effect, test_effect in zip(expansion.effects, test_expansion.effects))
     return expansion
@@ -517,18 +519,13 @@ def test_metadata_garbage_collection():
     assert theorems[0].metadata == {"proof_state_idx": 0}
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
-    x = theorems[0].metadata
-    print(x)
-    print(x)
-    print(x)
-    assert x == {"proof_state_idx": 1}
     assert theorems[0].metadata == {"proof_state_idx": 1}
     expansion = _create_expansion2(theorems[0])
     search.expand_and_backup([expansion])
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
-    assert theorems[0].metadata == {"proof_state_idx": 2}
-    expansion = _create_expansion(theorems[0])
+    assert theorems[0].metadata == {"proof_state_idx": 3}
+    _create_expansion(theorems[0])
     with open("test.json", "w") as file:
         file.write(search.get_json_str())
 

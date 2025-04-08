@@ -54,7 +54,8 @@ static PyObject *make_q_value_solved(PyObject *module, PyObject *enum_module) {
     if (QValueSolvedEnum != NULL)
         return QValueSolvedEnum;
     const char *values[] = {
-        "OneOverCounts", "CountOverCounts", "One", "OneOverVirtualCounts", "OneOverCountsNoFPU", "CountOverCountsNoFPU"
+            "OneOverCounts", "CountOverCounts", "One", "OneOverVirtualCounts", "OneOverCountsNoFPU",
+            "CountOverCountsNoFPU"
     };
     QValueSolvedEnum = make_enum(module, enum_module, values, 6, "QValueSolved");
     return QValueSolvedEnum;
@@ -99,37 +100,6 @@ static PyModuleDef htps_module = {
     htps_methods,
 };
 
-// static PyObject *PolicyType_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-//     htps::PolicyType *self;
-//     self = (htps::PolicyType *)type->tp_alloc(type, 0);
-//     if (!self) {
-//         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
-//         return NULL;
-//     }
-//     return (PyObject *) self;
-// }
-//
-// static int PolicyType_init(htps::PolicyType *self, PyObject *args, PyObject *kwargs) {
-//     int value = 0;
-//     if (!PyArg_ParseTuple(args, "i", &value)) {
-//         return -1;
-//     }
-//     *self = (htps::PolicyType) value;
-//     return 0;
-// }
-//
-// static PyMethodDef PolicyType_methods[] = { //
-//     {NULL, NULL, 0, NULL}};
-//
-// static PyTypeObject PolicyTypeType = {
-//     PyObject_HEAD_INIT(NULL, 0).tp_name = "htps.PolicyType",
-//     .tp_doc = "Policy type",
-//     .tp_basicsize = sizeof(htps::PolicyType),
-//     .tp_flags = Py_TPFLAGS_DEFAULT,
-//     .tp_methods = PolicyType_methods,
-//     .tp_new = (newfunc)PolicyType_new,
-//     .tp_init = (initproc)PolicyType_init,
-// };
 
 static PyObject *Params_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
     auto *self = (htps::htps_params *) type->tp_alloc(type, 0);
@@ -187,7 +157,7 @@ static int Params_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     int early_stopping, no_critic, backup_once, backup_one_for_solved, tactic_p_threshold, tactic_sample_q_conditioning,
             only_learn_best_tactics, early_stopping_solved_if_root_not_proven;
     PyObject *policy_obj, *q_value_solved_obj, *metric_obj, *node_mask_obj;
-    static char *kwlist[] = {
+    static const char *kwlist[] = {
             "exploration",
             "policy_type",
             "num_expansions",
@@ -213,7 +183,7 @@ static int Params_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             NULL
     };
     const char *format = "dO" "nn" "pppp" "d" "n" "ppp" "d" "O" "d" "OO" "dd" "pn";
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, const_cast<char**>(kwlist),
                                      &exploration,
                                      &policy_obj,
                                      &num_expansions,
@@ -425,40 +395,64 @@ static PyTypeObject ParamsType = {
         (newfunc) Params_new,
 };
 
+typedef struct {
+    PyObject_HEAD
+    htps::hypothesis cpp_obj;
+} PyHypothesis;
+
 static PyObject *Hypothesis_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::hypothesis *) type->tp_alloc(type, 0);
+    auto *self = (PyHypothesis *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
-    new(&(self->identifier)) std::string();
-    new(&(self->type)) std::string();
+    new(&(self->cpp_obj)) htps::hypothesis();
     return (PyObject *) self;
 }
 
 static int Hypothesis_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    auto *h = (htps::hypothesis *) self;
+    auto *h = (PyHypothesis *) self;
     const char *identifier = nullptr;
     const char *type_str = nullptr;
     static const char *kwlist[] = {"identifier", "value", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "ss", const_cast<char **>(kwlist), &identifier, &type_str))
         return -1;
-    h->identifier = identifier;
-    h->type = type_str;
+    h->cpp_obj.identifier = identifier;
+    h->cpp_obj.type = type_str;
     return 0;
 }
 
+static PyObject *PyHypothesis_get_identifier(PyObject *self, void *closure) {
+    auto py_hyp = (PyHypothesis *) self;
+    return PyObject_from_string(py_hyp->cpp_obj.identifier);
+}
+
+static PyObject *PyHypothesis_get_value(PyObject *self, void *closure) {
+    auto py_hyp = (PyHypothesis *) self;
+    return PyObject_from_string(py_hyp->cpp_obj.type);
+}
+
+static void PyHypothesis_dealloc(PyObject *self) {
+    auto *ctx = (PyHypothesis *) self;
+    ctx->cpp_obj.~hypothesis();
+    Py_TYPE(self)->tp_free(self);
+}
+
 static PyMemberDef HypothesisMembers[] = {
-        {"identifier", T_STRING, offsetof(htps::hypothesis, identifier), READONLY, "Identifier for a hypothesis"},
-        {"value",      T_STRING, offsetof(htps::hypothesis, type),       READONLY, "Type of the hypothesis"},
+        {NULL}
+};
+
+static PyGetSetDef Hypothesis_getsetters[] = {
+        {"identifier", (getter) PyHypothesis_get_identifier, NULL, "Identifier for a hypothesis", NULL},
+        {"value",      (getter) PyHypothesis_get_value, NULL, "Type of the hypothesis", NULL},
         {NULL}
 };
 
 static PyTypeObject HypothesisType = {
         PyObject_HEAD_INIT(NULL) "htps.Hypothesis",
-        sizeof(htps::hypothesis),
+        sizeof(PyHypothesis),
         0,
-        NULL,
+        (destructor)PyHypothesis_dealloc,
         NULL,
         NULL,
         NULL,
@@ -483,7 +477,7 @@ static PyTypeObject HypothesisType = {
         NULL,
         NULL,
         HypothesisMembers,
-        NULL,
+        Hypothesis_getsetters,
         NULL,
         NULL,
         NULL,
@@ -495,44 +489,75 @@ static PyTypeObject HypothesisType = {
 };
 
 
+typedef struct {
+    PyObject_HEAD
+    htps::tactic cpp_obj;
+} PyTactic;
+
+
+static void PyTactic_dealloc(PyObject *self) {
+    auto *ctx = (PyTactic *) self;
+    ctx->cpp_obj.~tactic();
+    Py_TYPE(self)->tp_free(self);
+}
+
 static PyObject *Tactic_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::tactic *) type->tp_alloc(type, 0);
+    auto *self = (PyTactic *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
-    new(&(self->unique_string)) std::string();
+    new(&(self->cpp_obj)) htps::tactic();
     return (PyObject *) self;
 }
 
 static int Tactic_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    auto *t = (htps::tactic *) self;
+    auto *t = (PyTactic *) self;
     const char *unique_str = nullptr;
     int is_valid;
     size_t duration;
     static char *kwlist[] = {(char *) "unique_string", (char *) "is_valid", (char *) "duration", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "spn", kwlist, &unique_str, &is_valid, &duration))
         return -1;
-    t->unique_string = unique_str;
-    t->is_valid = is_valid ? true : false;
-    t->duration = duration;
+    t->cpp_obj.unique_string = unique_str;
+    t->cpp_obj.is_valid = is_valid ? true : false;
+    t->cpp_obj.duration = duration;
     return 0;
 }
 
 
+static PyObject *PyTactic_get_unique_string(PyObject *self, void *closure) {
+    auto tac = (PyTactic *) self;
+    return PyObject_from_string(tac->cpp_obj.unique_string);
+}
+
+static PyObject *PyTactic_get_is_valid(PyObject *self, void *closure) {
+    auto tac = (PyTactic *) self;
+    return tac->cpp_obj.is_valid ? Py_True: Py_False;
+}
+
+static PyObject *PyTactic_get_duration(PyObject *self, void *closure) {
+    auto tac = (PyTactic *) self;
+    return PyLong_FromSize_t(tac->cpp_obj.duration);
+}
+
+static PyGetSetDef PyTactic_getsetters[] = {
+        {"unique_string", (getter) PyTactic_get_unique_string, NULL, "Unique identifier for a tactic", NULL},
+        {"is_valid", (getter) PyTactic_get_is_valid, NULL, "Whether the tactic is valid or not", NULL},
+        {"duration", (getter) PyTactic_get_duration, NULL, "Duration of tactic in the environment", NULL},
+        {NULL}
+};
+
 static PyMemberDef TacticMembers[] = {
-        {"unique_string", T_STRING, offsetof(htps::tactic, unique_string), READONLY, "Unique identifier for a tactic"},
-        {"is_valid",      T_BOOL,   offsetof(htps::tactic, is_valid),                    READONLY, "Whether the tactic is valid or not"},
-        {"duration",      T_LONG,   offsetof(htps::tactic, duration),      READONLY, "Duration in milliseconds"},
         {NULL}
 };
 
 
 static PyTypeObject TacticType = {
         PyObject_HEAD_INIT(NULL) "htps.Tactic",
-        sizeof(htps::tactic),
+        sizeof(PyTactic),
         0,
-        NULL,
+        (destructor) PyTactic_dealloc,
         NULL,
         NULL,
         NULL,
@@ -557,7 +582,7 @@ static PyTypeObject TacticType = {
         NULL,
         NULL,
         TacticMembers,
-        NULL,
+        PyTactic_getsetters,
         NULL,
         NULL,
         NULL,
@@ -569,18 +594,23 @@ static PyTypeObject TacticType = {
 };
 
 
+typedef struct {
+    PyObject_HEAD
+    htps::context cpp_obj;
+} PyHTPSContext;
+
 static PyObject *Context_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    auto *self = (htps::context *) type->tp_alloc(type, 0);
+    auto *self = (PyHTPSContext *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
         return NULL;
     }
-    new(&(self->namespaces)) std::set<std::string>();
+    new(&(self->cpp_obj)) htps::context();
     return (PyObject *) self;
 }
 
 static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
-    auto *c = (htps::context *) self;
+    auto *c = (PyHTPSContext *) self;
     static char *kwlist[] = {(char *) "namespaces", NULL};
     PyObject *namespace_set, *iterator;
 
@@ -607,17 +637,17 @@ static int Context_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    c->namespaces = std::move(namespaces);
+    c->cpp_obj.namespaces = std::move(namespaces);
     return 0;
 }
 
 static PyObject *Context_get_namespaces(PyObject *self, void *closure) {
-    auto *context = (htps::context *) self;
-    PyObject *py_list = PyList_New(context->namespaces.size());
+    auto *context = (PyHTPSContext *) self;
+    PyObject *py_list = PyList_New(context->cpp_obj.namespaces.size());
     if (!py_list)
         return NULL;
-    size_t i = 0;
-    for (const auto &ns: context->namespaces) {
+    Py_ssize_t i = 0;
+    for (const auto &ns: context->cpp_obj.namespaces) {
         PyObject *py_str = PyObject_from_string(ns);
         if (!py_str) {
             Py_DECREF(py_list);
@@ -629,7 +659,7 @@ static PyObject *Context_get_namespaces(PyObject *self, void *closure) {
 }
 
 static int Context_set_namespaces(PyObject *self, PyObject *value, void *closure) {
-    auto *context = (htps::context *) self;
+    auto *context = (PyHTPSContext *) self;
     PyObject *iterator = PyObject_GetIter(value);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "namespaces must be iterable");
@@ -651,7 +681,7 @@ static int Context_set_namespaces(PyObject *self, PyObject *value, void *closure
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
-    context->namespaces = std::move(namespaces);
+    context->cpp_obj.namespaces = std::move(namespaces);
     return 0;
 }
 
@@ -661,16 +691,16 @@ static PyGetSetDef Context_getsetters[] = {
 };
 
 static void Context_dealloc(PyObject *self) {
-    auto *ctx = (htps::context *) self;
-    ctx->namespaces.~set<std::string>();
+    auto *ctx = (PyHTPSContext *) self;
+    ctx->cpp_obj.~context();
     Py_TYPE(self)->tp_free(self);
 }
 
 static PyTypeObject ContextType = {
         PyObject_HEAD_INIT(NULL) "htps.Context",
-        sizeof(htps::context),
+        sizeof(PyHTPSContext),
         0,
-        Context_dealloc,
+        (destructor)Context_dealloc,
         NULL,
         NULL,
         NULL,
@@ -784,8 +814,8 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             Py_DECREF(metadata);
             return -1;
         }
-        auto *h = (htps::hypothesis *) item;
-        theses.push_back(*h);
+        auto *h = (PyHypothesis *) item;
+        theses.push_back(h->cpp_obj);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
@@ -805,15 +835,15 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
             Py_DECREF(metadata);
             return -1;
         }
-        auto *tactic = (htps::tactic *) item;
-        tacs.push_back(*tactic);
+        auto *tactic = (PyTactic *) item;
+        tacs.push_back(tactic->cpp_obj);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
 
-    auto *c_ctx = (htps::context *) context;
+    auto *c_ctx = (PyHTPSContext *) context;
     // Copy underlying Lean context
-    t->cpp_obj->set_context(*c_ctx);
+    t->cpp_obj->set_context(c_ctx->cpp_obj);
     t->cpp_obj->unique_string = unique_str;
     t->cpp_obj->conclusion = conclusion;
     t->cpp_obj->hypotheses = theses;
@@ -826,10 +856,10 @@ static int Theorem_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 static PyObject *Theorem_get_context(PyObject *self, void *closure) {
     auto *thm = (PyTheorem *) self;
-    auto *new_ctx = (htps::context *) Context_new(&ContextType, NULL, NULL);
+    auto *new_ctx = (PyHTPSContext *) Context_new(&ContextType, NULL, NULL);
     if (!new_ctx)
         return PyErr_NoMemory();
-    new_ctx->namespaces = thm->cpp_obj->ctx.namespaces;
+    new_ctx->cpp_obj.namespaces = thm->cpp_obj->ctx.namespaces;
     return (PyObject *) new_ctx;
 }
 
@@ -843,8 +873,8 @@ static int Theorem_set_context(PyObject *self, PyObject *value, void *closure) {
         PyErr_SetString(PyExc_TypeError, "context must be a Context object");
         return -1;
     }
-    auto *new_ctx = (htps::context *) value;
-    thm->cpp_obj->set_context(*new_ctx);
+    auto *new_ctx = (PyHTPSContext *) value;
+    thm->cpp_obj->set_context(new_ctx->cpp_obj);
     return 0;
 }
 
@@ -895,8 +925,8 @@ static int Theorem_set_hypotheses(PyObject *self, PyObject *value, void *closure
             Py_DECREF(iterator);
             return -1;
         }
-        auto *hyp = (htps::hypothesis *) item;
-        new_hypotheses.push_back(*hyp);
+        auto *hyp = (PyHypothesis *) item;
+        new_hypotheses.push_back(hyp->cpp_obj);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
@@ -947,8 +977,8 @@ static int Theorem_set_past_tactics(PyObject *self, PyObject *value, void *closu
             Py_DECREF(iterator);
             return -1;
         }
-        auto *tactic = (htps::tactic *) item;
-        new_tactics.push_back(*tactic);
+        auto *tactic = (PyTactic *) item;
+        new_tactics.push_back(tactic->cpp_obj);
         Py_DECREF(item);
     }
     Py_DECREF(iterator);
@@ -1061,6 +1091,7 @@ PyObject *Theorem_NewFromShared(const htps::TheoremPointer &thm_ptr) {
     py_thm->cpp_obj->past_tactics = thm->past_tactics;
     printf("Copy dict!\n");
     if (thm->metadata.has_value()) {
+        printf("Refcount: %zi\n", Py_REFCNT(std::any_cast<PyObject *>(thm->metadata)));
         PyObject *copiedDict = PyDict_Copy(std::any_cast<PyObject *>(thm->metadata));
         printf("Copy dict finished!\n");
         if (copiedDict == NULL) {
@@ -1077,10 +1108,10 @@ PyObject *Tactic_NewFromShared(const std::shared_ptr<htps::tactic> &tac_ptr) {
     PyObject *obj = Tactic_new(&TacticType, NULL, NULL);
     if (obj == NULL)
         return NULL;
-    auto *c_obj = (htps::tactic *) obj;
-    c_obj->unique_string = tac->unique_string;
-    c_obj->is_valid = tac->is_valid;
-    c_obj->duration = tac->duration;
+    auto *py_obj = (PyTactic *) obj;
+    py_obj->cpp_obj.unique_string = tac->unique_string;
+    py_obj->cpp_obj.is_valid = tac->is_valid;
+    py_obj->cpp_obj.duration = tac->duration;
     return obj;
 }
 
@@ -1133,8 +1164,8 @@ static int EnvEffect_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     auto *eff = (htps::env_effect *) self;
     auto thm = (PyTheorem *) py_goal;
     auto shared_thm = thm->cpp_obj;
-    auto tactic = (htps::tactic *) py_tac;
-    auto shared_tactic = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tactic));
+    auto tactic = (PyTactic *) py_tac;
+    auto shared_tactic = std::make_shared<htps::tactic>(tactic->cpp_obj);
     eff->goal = ((PyTheorem *) py_goal)->cpp_obj;
     eff->tac = shared_tactic;
     eff->children = children_vec;
@@ -1177,8 +1208,8 @@ static int EnvEffect_set_tac(PyObject *self, PyObject *value, void *closure) {
         return -1;
     }
     auto *effect = (htps::env_effect *) self;
-    auto tac = (htps::tactic *) value;
-    auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
+    auto tac = (PyTactic *) value;
+    auto shared_tac = std::make_shared<htps::tactic>(tac->cpp_obj);
     effect->tac = shared_tac;
     return 0;
 }
@@ -1490,8 +1521,8 @@ static int EnvExpansion_set_tactics(PyObject *self, PyObject *value, void *closu
             Py_DECREF(iter);
             return -1;
         }
-        auto *tac = (htps::tactic *) item;
-        auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
+        auto *tac = (PyTactic *) item;
+        auto shared_tac = std::make_shared<htps::tactic>(tac->cpp_obj);
         tactics.push_back(shared_tac);
         Py_DECREF(item);
     }
@@ -1720,8 +1751,8 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                     Py_DECREF(iter);
                     return -1;
                 }
-                auto *tac = (htps::tactic *) item;
-                auto shared_tac = std::static_pointer_cast<htps::tactic>(std::make_shared<htps::tactic>(*tac));
+                auto *tac = (PyTactic *) item;
+                auto shared_tac = std::make_shared<htps::tactic>(tac->cpp_obj);
                 tactics.push_back(shared_tac);
                 Py_DECREF(item);
             }

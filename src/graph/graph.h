@@ -886,9 +886,13 @@ namespace htps {
             return _map.empty();
         }
 
-        static TheoremMap<T> from_json(const nlohmann::json &j) {
+        static TheoremMap<T> from_json(const nlohmann::json &j, T *null_replacement = nullptr) {
             TheoremMap<T> map;
             for (const auto &[key, value]: j.items()) {
+                if (value.is_null() && null_replacement != nullptr) {
+                    map.insert(key, *null_replacement);
+                    continue;
+                }
                 map.insert(key, value);
             }
             return map;

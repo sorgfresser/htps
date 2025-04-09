@@ -151,11 +151,14 @@ namespace htps {
 
         ~TheoremPointer() {
             if (operator bool() && this->get()->metadata.has_value()) {
-                // TODO: Check if is python object
 #ifdef PYTHON_BINDINGS
                 if (this->use_count() == 1) {
-                    auto py_metadata = std::any_cast<PyObject *>(this->get()->metadata);
-                    Py_XDECREF(py_metadata);
+                    try {
+                        auto py_metadata = std::any_cast<PyObject *>(this->get()->metadata);
+                        Py_XDECREF(py_metadata);
+                    }
+                    catch (std::bad_any_cast &e) {
+                    }
                 }
 #endif
             }

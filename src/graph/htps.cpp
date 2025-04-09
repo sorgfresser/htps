@@ -307,7 +307,8 @@ Simulation Simulation::from_json(const nlohmann::json &j) {
         s.values = TheoremMap<double>();
     }
     else {
-        s.values = TheoremMap<double>::from_json(j["values"]);
+        auto null_replacement = MIN_FLOAT; // -inf is serialized as null
+        s.values = TheoremMap<double>::from_json(j["values"], &null_replacement);
     }
     if (j["solved"].is_null()) {
         s.solved = TheoremMap<bool>();
@@ -719,7 +720,11 @@ HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
     node.is_solved_leaf = j["is_solved_leaf"];
     node.in_proof = j["in_proof"];
     node.old_critic_value = j["old_critic_value"];
-    node.log_critic_value = j["log_critic_value"];
+    if (!j["log_critic_value"].is_null()) {
+        node.log_critic_value = j["log_critic_value"];
+    } else {
+        node.log_critic_value = MIN_FLOAT;
+    }
     node.priors = static_cast<std::vector<double>>(j["priors"]);
     node.q_value_solved = j["q_value_solved"];
     node.policy = j["policy"];
@@ -907,6 +912,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
                 p = p / p_sum;
             }
 #ifdef VERBOSE_PRINTS
+            printf("Policy: ");
             for (auto &p: node_policy) {
                 printf("%lf ", p);
             }
@@ -1095,6 +1101,11 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
             sum_log += std::log(params.depth_penalty);
         }
         assert(sum_log <= 0);
+#ifdef VERBOSE_PRINTS
+        if (sum_log <= MIN_FLOAT) {
+            printf("Sum log is min float\n");
+        }
+#endif
         sim->set_value(cur, sum_log);
         if (sim->get_virtual_count_added(cur)) {
             current_node->subtract_virtual_count(sim->get_tactic_id(cur), params.virtual_loss);
@@ -1130,6 +1141,9 @@ void HTPS::batch_to_expand(std::vector<TheoremPointer> &theorems) {
         Simulation sim;
         while (!dead_root()) {
             try {
+#ifdef VERBOSE_PRINTS
+                printf("Finding leaves to expand\n");
+#endif
                 sim = find_leaves_to_expand(terminal, to_expand);
                 break;
             } catch (FailedTacticException &e) {

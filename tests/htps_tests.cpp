@@ -685,7 +685,7 @@ TEST_F(HTPSTest, TestSiblingEquality) {
     TheoremPointer child3 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B3"));
 
     effects.clear();
-    effect->goal = child3;
+    effect->goal = child1;
     effect->tac = dummyTac2;
     effect->children = {child3};
     effects.push_back(effect);
@@ -699,7 +699,7 @@ TEST_F(HTPSTest, TestSiblingEquality) {
 
     effects.clear();
     effect = std::make_shared<htps::env_effect>();
-    effect->goal = child3;
+    effect->goal = child2;
     effect->tac = dummyTac3;
     effect->children = {child3};
     effects.push_back(effect);
@@ -714,6 +714,224 @@ TEST_F(HTPSTest, TestSiblingEquality) {
     htps_instance->theorems_to_expand();
 }
 
+
+/* It suffices if a single goal of each tactic is killed for a node to become unsolvable.
+ * This test asserts that indeed, if only one goal of a tactic is killed, we set the tactic as killed
+ */
+TEST_F(HTPSTest, TestLoopMultipleChildren) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1, child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1, child2}};
+    std::vector<double> priors = {1.0};
+    std::vector<size_t> envDurations = {1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems[1] == child2);
+
+    TheoremPointer child3 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B3"));
+    TheoremPointer child4 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B4"));
+
+    effects.clear();
+    effect->goal = child1;
+    effect->tac = dummyTac2;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child2;
+    effect->tac = dummyTac3;
+    effect->children = {child4};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child4}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child5 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B5"));
+
+    expansions.clear();
+    effects.clear();
+    effect->goal = child3;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child1}};
+    priors = {1.0};
+    envDurations = {1};
+    // Killed B3 by circle to B1, which will also kill B1
+    expansion = {child3, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child4;
+    effect->tac = dummyTac3;
+    effect->children = {child5};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child5}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child4, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
+
+    // Assertions
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult result = htps_instance->get_result();
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    // Proof should be empty
+    EXPECT_TRUE(!result.get_proof().proof_theorem);
+    EXPECT_TRUE(!result.get_proof().proof_tactic);
+    EXPECT_TRUE(result.get_proof().children.empty());
+    // Still, we have samples
+    EXPECT_TRUE(samples_tactic.empty());
+    size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
+    EXPECT_TRUE(bad_counts == 3 && samples_critic.size() == 5);
+    EXPECT_TRUE(samples_effect.size() == 5);
+    // No proof samples though, as there is no proof
+    EXPECT_TRUE(proof_samples_tactics.empty());
+}
+
+/* If all tactics of a node are killed, all the tactics leading to this node are also killed.
+ * But if another way to get to that node is found after the node has been killed, the new way has to be killed too.
+ * The case is tested by creating nodes B1, B2 from root, and B1 being killed and afterwards B2 reaching B1.
+ * This regression test ensures this works.
+ */
+TEST_F(HTPSTest, TestAddToKilled) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1}, {child2}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems.size() == 1);
+
+    // Now kill B1 by circling to root
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child1;
+    effect->tac = dummyTac;
+    effect->children = {root};
+    effects.push_back(effect);
+    tactics = {dummyTac};
+    childrenForTactic = {{root}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    // Now B1 is dead, but B2 remains
+    theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child2 && theorems.size() == 1);
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_FALSE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->dead_root());
+
+    // Now B2 reaches B1
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child2;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child1}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+    htps_instance->expand_and_backup(expansions);
+
+    htps_instance->theorems_to_expand();
+
+    // Now all should be dead
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult result = htps_instance->get_result();
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    // Proof should be empty
+    EXPECT_TRUE(!result.get_proof().proof_theorem);
+    EXPECT_TRUE(!result.get_proof().proof_tactic);
+    EXPECT_TRUE(result.get_proof().children.empty());
+    // Still, we have samples
+    EXPECT_TRUE(samples_tactic.empty());
+    size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
+    EXPECT_TRUE(bad_counts == 3 && samples_critic.size() == 3);
+    EXPECT_TRUE(samples_effect.size() == 4);
+    // No proof samples though, as there is no proof
+    EXPECT_TRUE(proof_samples_tactics.empty());
+}
 
 
 TEST_F(HTPSTest, TestJsonLoading) {

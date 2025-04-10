@@ -1546,7 +1546,7 @@ namespace htps {
                     }
                 }
                 for (size_t bad_tactic_id: bad_tactic_ids) {
-                    node.kill_tactic(bad_tactic_id);
+                    kill_tactic(node_ptr, bad_tactic_id);
                 }
                 to_check_solved.push_back(node_ptr);
             }

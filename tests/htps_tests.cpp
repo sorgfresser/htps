@@ -12,6 +12,29 @@
 
 using namespace htps;
 
+nlohmann::json load_json_from_file(const std::string &filename) {
+    std::ifstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    nlohmann::json j = nlohmann::json::parse(file);
+    return j;
+}
+
+void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    // Dump JSON object to the file with an indent of 4 spaces.
+    file << j.dump(4);
+
+    if (!file.good()) {
+        throw std::runtime_error("Error writing to file: " + filename);
+    }
+}
+
 class DummyTheorem : public theorem {
 public:
     DummyTheorem(const std::string &conclusion,
@@ -551,30 +574,6 @@ TEST_F(HTPSTest, TestCountThreshold) {
 }
 
 
-nlohmann::json load_json_from_file(const std::string &filename) {
-    std::ifstream file(filename);
-    if (!file) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-    nlohmann::json j = nlohmann::json::parse(file);
-    return j;
-}
-
-void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
-    std::ofstream file(filename);
-    if (!file) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-
-    // Dump JSON object to the file with an indent of 4 spaces.
-    file << j.dump(4);
-
-    if (!file.good()) {
-        throw std::runtime_error("Error writing to file: " + filename);
-    }
-}
-
-
 TEST_F(HTPSTest, TestInfiniteLoop) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
@@ -639,12 +638,6 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     EXPECT_TRUE(samples_effect.size() == 3);
     // No proof samples though, as there is no proof
     EXPECT_TRUE(proof_samples_tactics.empty());
-
-    auto json = nlohmann::json(*htps_instance);
-    dump_json_to_file(json, "samples/test2.json");
-
-    auto json2 = nlohmann::json(expansion);
-    dump_json_to_file(json2, "samples/test3.json");
 }
 
 /* Within a single proof tree, two sibling branches might face the same theorem at some point.
@@ -931,6 +924,50 @@ TEST_F(HTPSTest, TestAddToKilled) {
     EXPECT_TRUE(samples_effect.size() == 4);
     // No proof samples though, as there is no proof
     EXPECT_TRUE(proof_samples_tactics.empty());
+}
+
+/* Two tactics leading to the same children from the same starting node.
+ */
+TEST_F(HTPSTest, TestMultipleSame) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1}, {child1}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems.size() == 1);
+
+    // Now store to json and load from json
+    nlohmann::json j = htps_instance->operator nlohmann::json();
+    dump_json_to_file(j, "test.json");
+    auto j2 = load_json_from_file("test.json");
+    HTPS search2 = htps::HTPS::from_json(j2);
+    search2.get_result();
 }
 
 

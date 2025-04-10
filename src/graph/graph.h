@@ -655,6 +655,16 @@ namespace htps {
         }
     };
 
+    namespace {
+        template <typename T, typename = void>
+        struct has_static_from_json : std::false_type {};
+
+        template <typename T>
+        struct has_static_from_json<T, std::void_t<decltype(T::from_json(std::declval<const nlohmann::json&>()))>>
+                : std::true_type {};
+    }
+
+
     struct PairHash {
         template<typename T>
         std::size_t operator()(const std::pair<std::string, T> &p) const {
@@ -741,30 +751,30 @@ namespace htps {
         }
 
         operator nlohmann::json() const {
-            nlohmann::json j;
+            nlohmann::json j = nlohmann::json::array();
+            size_t idx = 0;
             for (const auto &[key, value] : _set) {
-                j[key] = value;
+                j[idx++] = nlohmann::json::array({key, value});
             }
             return j;
         }
 
         static TheoremPairSet<T> from_json(const nlohmann::json &j) {
             TheoremPairSet<T> set;
-            for (const auto &[key, value] : j.items()) {
-                set.insert(key, value);
+            for (const auto &pair : j) {
+                if (pair.size() != 2) {
+                    throw std::invalid_argument("Invalid pair size");
+                }
+                std::string key = pair[0];
+                if constexpr (has_static_from_json<T>::value) {
+                    set.insert(key, (T::from_json(pair[1])));
+                } else {
+                    set.insert(key, (pair[1].get<T>()));
+                }
             }
             return set;
         }
     };
-
-    namespace {
-        template <typename T, typename = void>
-        struct has_static_from_json : std::false_type {};
-
-        template <typename T>
-        struct has_static_from_json<T, std::void_t<decltype(T::from_json(std::declval<const nlohmann::json&>()))>>
-                : std::true_type {};
-    }
 
     // Map a theorem to type T
     template<typename T>

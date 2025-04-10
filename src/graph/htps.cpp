@@ -952,6 +952,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
                 printf("Leaf node\n");
             printf("Tactics size: %zu\n", HTPS_node->n_tactics());
 #endif
+            assert(!HTPS_node->all_tactics_killed());
             assert(HTPS_node->is_solved_leaf_node() || is_leaf_node);
             sim.set_value(current, HTPS_node->get_value(), previous);
             sim.set_solved(current, true, previous);

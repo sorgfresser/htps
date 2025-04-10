@@ -488,19 +488,19 @@ namespace htps {
         Metric metric;
         std::vector<HTPSSampleTactics> proof_samples_tactics;
         TheoremPointer goal;
-        struct proof p;
+        std::optional<struct proof> p;
     public:
         HTPSResult(std::vector<HTPSSampleCritic> &samples_critic, std::vector<HTPSSampleTactics> &samples_tactic,
                    std::vector<HTPSSampleEffect> &samples_effect, Metric metric,
                    std::vector<HTPSSampleTactics> &proof_samples_tactics, TheoremPointer &goal,
-                   struct proof &p) :
+                   std::optional<struct proof> &p) :
                 samples_critic(samples_critic), samples_tactic(samples_tactic), samples_effect(samples_effect),
                 metric(metric), proof_samples_tactics(proof_samples_tactics), goal(goal),
                 p(p) {}
 
         HTPSResult() = default;
 
-        struct proof get_proof() const;
+        std::optional<struct proof> get_proof() const;
 
         TheoremPointer get_goal() const;
 

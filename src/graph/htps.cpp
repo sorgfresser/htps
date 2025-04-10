@@ -1352,7 +1352,7 @@ HTPSResult HTPS::get_result() {
     }
     build_in_proof();
     get_node_proof_sizes_and_depths();
-    struct proof p;
+    std::optional<struct proof> p;
     if (is_proven()) {
         for (size_t i = 0; i < METRIC_COUNT; i++) {
             assert(minimum_proof_size.has_value(static_cast<Metric>(i)));
@@ -1494,7 +1494,7 @@ htps::htps_params HTPS::get_params() const {
 }
 
 
-proof HTPSResult::get_proof() const {
+std::optional<proof> HTPSResult::get_proof() const {
     return p;
 }
 

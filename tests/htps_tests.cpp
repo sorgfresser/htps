@@ -182,7 +182,7 @@ TEST_F(HTPSTest, GetResultImmediatelySolvedTest) {
     htps::HTPSResult result = htps_instance->get_result();
 
     // Verify that the proof in the result has the root theorem.
-    EXPECT_EQ(result.get_proof().proof_theorem->unique_string, root->unique_string);
+    EXPECT_EQ(result.get_proof().value().proof_theorem->unique_string, root->unique_string);
     // Other result components like samples can be checked for non-emptiness.
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
     EXPECT_FALSE(samples_critic.empty());
@@ -350,7 +350,7 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     EXPECT_TRUE(result.get_goal() == root);
 
     // Check proof
-    struct proof p = result.get_proof();
+    struct proof p = result.get_proof().value();
     EXPECT_TRUE(p.proof_theorem == root);
     EXPECT_TRUE(p.proof_tactic ==dummyTac);
     auto p_children = p.children;
@@ -628,9 +628,7 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     auto res = htps_instance->get_result();
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = res.get_samples();
     // Proof should be empty
-    EXPECT_TRUE(!res.get_proof().proof_theorem);
-    EXPECT_TRUE(!res.get_proof().proof_tactic);
-    EXPECT_TRUE(res.get_proof().children.empty());
+    EXPECT_TRUE(!res.get_proof().has_value());
     // Still, we might have samples
     EXPECT_TRUE(samples_tactic.empty());
     bool is_bad = std::all_of(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
@@ -813,9 +811,7 @@ TEST_F(HTPSTest, TestLoopMultipleChildren) {
     HTPSResult result = htps_instance->get_result();
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
     // Proof should be empty
-    EXPECT_TRUE(!result.get_proof().proof_theorem);
-    EXPECT_TRUE(!result.get_proof().proof_tactic);
-    EXPECT_TRUE(result.get_proof().children.empty());
+    EXPECT_TRUE(!result.get_proof().has_value());
     // Still, we have samples
     EXPECT_TRUE(samples_tactic.empty());
     size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
@@ -914,9 +910,7 @@ TEST_F(HTPSTest, TestAddToKilled) {
     HTPSResult result = htps_instance->get_result();
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
     // Proof should be empty
-    EXPECT_TRUE(!result.get_proof().proof_theorem);
-    EXPECT_TRUE(!result.get_proof().proof_tactic);
-    EXPECT_TRUE(result.get_proof().children.empty());
+    EXPECT_TRUE(!result.get_proof().has_value());
     // Still, we have samples
     EXPECT_TRUE(samples_tactic.empty());
     size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});

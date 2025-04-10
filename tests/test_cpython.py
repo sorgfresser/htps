@@ -471,10 +471,10 @@ def test_htps_expansion():
 
 def _create_expansion(theorem):
     priors = [0.7, 0.3]
-    tactic_a = Tactic('intro a b', True, 0)
-    tactic_b = Tactic('intro b a', True, 0)
+    tactic_a = Tactic('TACA', True, 0)
+    tactic_b = Tactic('TACB', True, 0)
     tactics = [tactic_a, tactic_b]
-    child_conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b'
+    child_conclusion = 'B'
     child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
     child_thm.metadata = {"proof_state_idx": 1}
     child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
@@ -487,15 +487,15 @@ def _create_expansion(theorem):
 
 def _create_expansion2(theorem):
     priors = [0.7, 0.3]
-    tactic_a = Tactic('intro a b', True, 0)
-    tactic_b = Tactic('intro b a', True, 0)
-    tactics = [tactic_a, tactic_b]
-    child_conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c'
+    tactic_c = Tactic('TACC', True, 0)
+    tactic_d = Tactic('TACD', True, 0)
+    tactics = [tactic_c, tactic_d]
+    child_conclusion = 'C'
     child_thm = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
     child_thm.metadata = {"proof_state_idx": 2}
     child_thm2 = Theorem(child_conclusion, unique_string=child_conclusion, hypotheses=[], context=Context([]), past_tactics=[])
     child_thm2.metadata={"proof_state_idx": 3}
-    effects = [EnvEffect(theorem, tactic_a, [child_thm]), EnvEffect(theorem, tactic_b, [child_thm2])]
+    effects = [EnvEffect(theorem, tactic_c, [child_thm]), EnvEffect(theorem, tactic_d, [child_thm2])]
     times = [0, 0]
     children_for_tactic = [[child_thm], [child_thm2]]
     expansion = EnvExpansion(theorem, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
@@ -516,7 +516,7 @@ def _create_expansion2(theorem):
 
 def test_metadata_garbage_collection():
     context = Context([])
-    conclusion = 'S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b'
+    conclusion = 'A'
     root_thm = Theorem(conclusion, unique_string=conclusion, hypotheses=[], context=context, past_tactics=[])
     root_thm.metadata = {"proof_state_idx": 0}
     params = SearchParams(0.3, PolicyType.RPO, num_expansions=50, succ_expansions=3,
@@ -589,3 +589,13 @@ def test_runtime_error():
     children_for_tactic_past_tactic_strs = [[['intro a b', 'convert hS']], [['intro a b', 'have := hS a b']], [['intro a b', 'convert hS a b'], ['intro a b', 'convert hS a b']], [['intro a b', 'convert hS a b using 1']], [['intro a b', 'specialize hS a b']]]
     past_tactics_children = [[[Tactic(children_str, True, 0) for children_str in children_strs] for children_strs in tactic_children_str] for tactic_children_str in children_for_tactic_past_tactic_strs]
     children_for_tactic = [[Theorem(conclusion=conclusion, unique_string=conclusion, hypotheses=[], context=context, past_tactics=[Tactic(tactic_str, True, 0) for tactic_str in tactic_strs]) for tactic_strs, child in zip(children_tactic_strs, children)] for children_tactic_strs, children in zip(children_for_tactic_past_tactic_strs, children_for_tactic_conclusions)]
+
+def test_result_json():
+    with open("samples/test.json", "r") as file:
+        data = file.read()
+    search = HTPS.from_json_str(data)
+    result = search.get_result()
+
+    # No proof
+    assert not search.is_done()
+    assert not result.proof

@@ -2705,8 +2705,9 @@ static int PyHTPSResult_init(PyObject *self, PyObject *args, PyObject *kwargs) {
     auto thm = goal->cpp_obj;
     auto *proof = (PyProof *) py_proof;
     result->cpp_obj.~HTPSResult();
+    std::optional<htps::proof> proof_opt = proof->cpp_obj;
     new(&result->cpp_obj) htps::HTPSResult(critic_samples, tactic_samples, effect_samples, metric,
-                                           proof_samples_tactics, thm, proof->cpp_obj);
+                                           proof_samples_tactics, thm, proof_opt);
     return 0;
 }
 
@@ -2985,7 +2986,10 @@ static PyObject *PyHTPSResult_get_goal(PyHTPSResult *self, void *closure) {
 }
 
 static PyObject *PyHTPSResult_get_proof(PyHTPSResult *self, void *closure) {
-    return PyProof_NewFromProof(self->cpp_obj.get_proof());
+    auto p = self->cpp_obj.get_proof();
+    if (!p.has_value())
+        return Py_None;
+    return PyProof_NewFromProof(p.value());
 }
 
 static PyGetSetDef PyHTPSResult_getsetters[] = {

@@ -62,7 +62,7 @@ namespace htps {
 
         MinimumLengthMap() : minimum_length{MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH, MAXIMUM_PROOF_LENGTH} {}
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             j["DEPTH"] = minimum_length[DEPTH];
             j["SIZE"] = minimum_length[SIZE];
@@ -111,7 +111,7 @@ namespace htps {
 
         MinimumTacticMap() : minimum_tactics{std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>()} {}
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             j["DEPTH"] = minimum_tactics[DEPTH];
             j["SIZE"] = minimum_tactics[SIZE];
@@ -169,7 +169,7 @@ namespace htps {
             std::cout << '\n';
         }
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             j["DEPTH"] = minimum_tactic_length[DEPTH];
             j["SIZE"] = minimum_tactic_length[SIZE];
@@ -207,7 +207,7 @@ namespace htps {
 
         MinimumBoolMap() : minimum_bool{false, false, false} {}
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             j["DEPTH"] = minimum_bool[DEPTH];
             j["SIZE"] = minimum_bool[SIZE];
@@ -470,7 +470,7 @@ namespace htps {
             return in_minimum_proof.get(metric);
         }
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             j["theorem"] = *thm;
             std::vector<nlohmann::json> tactic_json;
@@ -638,7 +638,7 @@ namespace htps {
             return _set.empty();
         }
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             for (const auto &s : _set) {
                 j.push_back(s);
@@ -665,8 +665,7 @@ namespace htps {
         }
     };
 
-    template
-            <typename T>
+    template <typename T>
     class TheoremPairSet {
     private:
         std::unordered_set<std::pair<std::string, T>, PairHash> _set;
@@ -741,7 +740,7 @@ namespace htps {
             return _set.empty();
         }
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             for (const auto &[key, value] : _set) {
                 j[key] = value;
@@ -757,6 +756,15 @@ namespace htps {
             return set;
         }
     };
+
+    namespace {
+        template <typename T, typename = void>
+        struct has_static_from_json : std::false_type {};
+
+        template <typename T>
+        struct has_static_from_json<T, std::void_t<decltype(T::from_json(std::declval<const nlohmann::json&>()))>>
+                : std::true_type {};
+    }
 
     // Map a theorem to type T
     template<typename T>
@@ -782,15 +790,15 @@ namespace htps {
             return _map.end();
         }
 
-        bool contains(const std::string &s) const {
+        virtual bool contains(const std::string &s) const {
             return _map.contains(s);
         }
 
-        bool contains(const theorem &thm) const {
+        virtual bool contains(const theorem &thm) const {
             return contains(thm.unique_string);
         }
 
-        bool contains(const TheoremPointer &thm) const {
+        virtual bool contains(const TheoremPointer &thm) const {
             return contains(*thm);
         }
 
@@ -893,15 +901,433 @@ namespace htps {
                     map.insert(key, *null_replacement);
                     continue;
                 }
-                map.insert(key, value);
+                if constexpr (has_static_from_json<T>::value) {
+                    map.insert(key, (T::from_json(value)));
+                } else {
+                    map.insert(key, (value.get<T>()));
+                }
+
             }
             return map;
         }
 
-        explicit operator nlohmann::json() const {
+        operator nlohmann::json() const {
             nlohmann::json j;
             for (const auto &[key, value]: _map) {
                 j[key] = value;
+            }
+            return j;
+        }
+    };
+
+    template<typename T>
+    class TheoremsMap {
+    private:
+        static std::vector<std::string> toVectorStrings(const std::vector<theorem> &thms) {
+            std::vector<std::string> result;
+            result.reserve(thms.size());
+            for (auto &t : thms) {
+                result.push_back(t.unique_string);
+            }
+            return result;
+        }
+
+        static std::vector<std::string> toVectorStrings(const std::vector<TheoremPointer> &thms) {
+            std::vector<std::string> result;
+            result.reserve(thms.size());
+            for (auto &t : thms) {
+                result.push_back(t->unique_string);
+            }
+            return result;
+        }
+
+        struct VectorStringHash {
+            std::size_t operator()(const std::vector<std::string> &vec) const {
+                std::size_t h = 0;
+                static const std::size_t magic = 0x9e3779b97f4a7c15ULL;
+                for (auto &s : vec) {
+                    std::size_t str_hash = std::hash<std::string>{}(s);
+                    h ^= str_hash + magic + (h << 6) + (h >> 2);
+                }
+                return h;
+            }
+        };
+
+        struct VectorStringEqual {
+            bool operator()(const std::vector<std::string> &lhs,
+                            const std::vector<std::string> &rhs) const {
+                return lhs == rhs;
+            }
+        };
+
+        std::unordered_map<std::vector<std::string>, T, VectorStringHash, VectorStringEqual> _map;
+
+    public:
+        TheoremsMap() : _map() {}
+
+        auto begin() noexcept { return _map.begin(); }
+        auto end() noexcept { return _map.end(); }
+        auto begin() const noexcept { return _map.begin(); }
+        auto end() const noexcept { return _map.end(); }
+
+        size_t size() const { return _map.size(); }
+        bool empty() const noexcept { return _map.empty(); }
+
+        bool contains(const std::vector<std::string> &thms) const {
+            return _map.contains(thms);
+        }
+        bool contains(const std::vector<theorem> &thms) const {
+            return contains(toVectorStrings(thms));
+        }
+        bool contains(const std::vector<TheoremPointer> &thms) const {
+            return contains(toVectorStrings(thms));
+        }
+
+        T &at(const std::vector<std::string> &thms) {
+            return _map.at(thms);
+        }
+        T &at(const std::vector<theorem> &thms) {
+            return at(toVectorStrings(thms));
+        }
+        T &at(const std::vector<TheoremPointer> &thms) {
+            return at(toVectorStrings(thms));
+        }
+
+        T at(const std::vector<std::string> &thms) const {
+            return _map.at(thms);
+        }
+        T at(const std::vector<theorem> &thms) const {
+            return at(toVectorStrings(thms));
+        }
+        T at(const std::vector<TheoremPointer> &thms) const {
+            return at(toVectorStrings(thms));
+        }
+
+        auto insert(const std::vector<std::string> &thms, const T &t) {
+            return _map.insert({thms, t});
+        }
+        auto insert(const std::vector<theorem> &thms, const T &t) {
+            return insert(toVectorStrings(thms), t);
+        }
+        auto insert(const std::vector<TheoremPointer> &thms, const T &t) {
+            return insert(toVectorStrings(thms), t);
+        }
+
+        auto insert_or_assign(const std::vector<std::string> &thms, const T &t) {
+            return _map.insert_or_assign(thms, t);
+        }
+        auto insert_or_assign(const std::vector<theorem> &thms, const T &t) {
+            return insert_or_assign(toVectorStrings(thms), t);
+        }
+        auto insert_or_assign(const std::vector<TheoremPointer> &thms, const T &t) {
+            return insert_or_assign(toVectorStrings(thms), t);
+        }
+
+        bool erase(const std::vector<std::string> &thms) {
+            return (_map.erase(thms) > 0);
+        }
+        bool erase(const std::vector<theorem> &thms) {
+            return erase(toVectorStrings(thms));
+        }
+        bool erase(const std::vector<TheoremPointer> &thms) {
+            return erase(toVectorStrings(thms));
+        }
+
+        auto find(const std::vector<std::string> &thms) const {
+            return _map.find(thms);
+        }
+        auto find(const std::vector<theorem> &thms) const {
+            return find(toVectorStrings(thms));
+        }
+        auto find(const std::vector<TheoremPointer> &thms) const {
+            return find(toVectorStrings(thms));
+        }
+
+        void set(const std::vector<std::string> &thms, const T &t) {
+            _map[thms] = t;
+        }
+        void set(const std::vector<theorem> &thms, const T &t) {
+            set(toVectorStrings(thms), t);
+        }
+        void set(const std::vector<TheoremPointer> &thms, const T &t) {
+            set(toVectorStrings(thms), t);
+        }
+
+        static TheoremsMap<T> from_json(const nlohmann::json &j, T *null_replacement = nullptr) {
+            TheoremsMap<T> map;
+            for (auto &element : j) {
+                // Each element should be an array of size 2: vector<string>, then T
+                if (!element.is_array() || element.size() != 2) {
+                    throw std::invalid_argument("Invalid JSON format for TheoremsMap");
+                }
+                auto keyVec = element[0].get<std::vector<std::string>>();
+                if (element[1].is_null() && null_replacement != nullptr) {
+                    map.insert(keyVec, *null_replacement);
+                } else {
+                    T val;
+                    if constexpr (has_static_from_json<T>::value) {
+                        val = T::from_json(element[1]);
+                    } else {
+                        val = element[1];
+                    }
+                    map.insert(keyVec, val);
+                }
+            }
+            return map;
+        }
+
+        operator nlohmann::json() const {
+            nlohmann::json j = nlohmann::json::array();
+            for (auto &pair : _map) {
+                nlohmann::json entry = nlohmann::json::array();
+                entry.push_back(pair.first);
+                entry.push_back(pair.second);
+                j.push_back(entry);
+            }
+            return j;
+        }
+    };
+
+    template <class T>
+    inline void hash_combine(std::size_t& old, const T& v) {
+        old ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (old<<6) + (old>>2);
+    }
+
+    template <class T>
+    inline size_t hash_combine(const std::size_t &old, const T& v) {
+        size_t res = old;
+        res ^= std::hash<T>{}(v) + 0x9e3779b97f4a7c15 + (res<<6) + (res>>2);
+        return res;
+    }
+
+    /* Used to combine theorems with a previous hash value to create a unique hash for theorems, even if the
+     * unique strings match.
+     * Will store not only the type to store, but also the previous hash value, so that it can be used for new values.
+     * */
+    template <typename T>
+    class TheoremIncrementalMap {
+    protected:
+        std::unordered_map<std::size_t, std::pair<T, std::size_t>> _map;
+    public:
+        TheoremIncrementalMap() : _map() {}
+
+        auto begin() noexcept { return _map.begin(); }
+
+        auto end() noexcept { return _map.end(); }
+
+        auto begin() const noexcept { return _map.begin(); }
+
+        auto end() const noexcept { return _map.end(); }
+
+        size_t combined_hash(const std::string &s, const size_t previous) const {
+            return hash_combine(previous, s);
+        }
+
+        bool contains(const std::string &s, const size_t previous) const {
+            return _map.contains(combined_hash(s, previous));
+        }
+
+        bool contains(const theorem &thm, const size_t previous) const {
+            return contains(thm.unique_string, previous);
+        }
+
+        bool contains(const TheoremPointer &thm, const size_t previous) const {
+            return contains(*thm, previous);
+        }
+
+        bool contains(const size_t value) const {
+            return _map.contains(value);
+        }
+
+        bool contains(const std::string &s) const {
+            return contains(std::hash<std::string>{}(s));
+        }
+
+        bool contains(const theorem &thm) const {
+            return contains(thm.unique_string);
+        }
+
+        bool contains(const TheoremPointer &thm) const {
+            return contains(*thm);
+        }
+
+        std::pair<T, std::size_t> &at(const size_t value) {
+            return _map.at(value);
+        }
+
+        std::pair<T, std::size_t> &at(const std::string &s) {
+            return at(std::hash<std::string>{}(s));
+        }
+
+        std::pair<T, std::size_t> &at(const theorem &thm) {
+            return at(thm.unique_string);
+        }
+
+        std::pair<T, std::size_t> &at(const TheoremPointer &thm) {
+            return at(*thm);
+        }
+
+        std::pair<T, std::size_t> at(const size_t value) const {
+            return _map.at(value);
+        }
+
+        std::pair<T, std::size_t> at(const std::string &s) const {
+            return at(std::hash<std::string>{}(s));
+        }
+
+        std::pair<T, std::size_t> at(const theorem &thm) const {
+            return at(thm.unique_string);
+        }
+
+        std::pair<T, std::size_t> at(const TheoremPointer &thm) const {
+            return at(*thm);
+        }
+
+        std::pair<T, std::size_t> &at(const std::string &s, const size_t previous) {
+            return _map.at(combined_hash(s, previous));
+        }
+
+        std::pair<T, std::size_t> &at(const theorem &thm, const size_t previous) {
+            return at(thm.unique_string, previous);
+        }
+
+        std::pair<T, std::size_t> &at(const TheoremPointer &thm, const size_t previous) {
+            return at(*thm, previous);
+        }
+
+        std::pair<T, std::size_t> at(const std::string &s, const size_t previous) const {
+            return _map.at(combined_hash(s, previous));
+        }
+
+        std::pair<T, std::size_t> at(const theorem &thm, const size_t previous) const {
+            return at(thm.unique_string, previous);
+        }
+
+        std::pair<T, std::size_t> at(const TheoremPointer &thm, const size_t previous) const {
+            return at(*thm, previous);
+        }
+
+        auto insert(const size_t value, const T &t, const size_t previous) {
+            return _map.insert({value, std::pair<T, std::size_t>(t, previous)});
+        }
+
+        auto insert(const std::string &s, const T &t, const size_t previous) {
+            std::size_t hash_ = hash_combine(previous, s);
+            return _map.insert({hash_, std::pair<T, std::size_t>(t, previous)});
+        }
+
+        auto insert(const theorem &thm, const T &t, const size_t previous) {
+            return insert(thm.unique_string, t, previous);
+        }
+
+        auto insert(const TheoremPointer &thm, const T &t, const size_t previous) {
+            return insert(*thm, t, previous);
+        }
+
+        auto insert_or_assign(const std::string &s, const T &t, const size_t previous) {
+            return _map.insert_or_assign(combined_hash(s, previous), std::pair<T, size_t>(t, previous));
+        }
+
+        auto insert_or_assign(const theorem &thm, const T &t, const size_t previous) {
+            return insert_or_assign(thm.unique_string, t, previous);
+        }
+
+        auto insert_or_assign(const TheoremPointer &thm, const T &t, const size_t previous) {
+            return insert_or_assign(*thm, t, previous);
+        }
+
+        auto insert_or_assign(const size_t value, const T &t, const size_t previous) {
+            return _map.insert_or_assign(value, std::pair<T, size_t>(t, previous));
+        }
+
+        bool erase(const std::string &s, const size_t previous) {
+            return _map.erase(combined_hash(s, previous)) > 0;
+        }
+
+        bool erase(const theorem &thm, const size_t previous) {
+            return erase(thm.unique_string, previous);
+        }
+
+        bool erase(const TheoremPointer &thm, const size_t previous) {
+            return erase(*thm, previous);
+        }
+
+        size_t size() const {
+            return _map.size();
+        }
+
+        auto find(const std::string &s, const size_t previous) const {
+            return _map.find(combined_hash(s, previous));
+        }
+
+        auto find(const theorem &thm, const size_t previous) const {
+            return find(thm.unique_string, previous);
+        }
+
+        auto find(const TheoremPointer &thm, const size_t previous) const {
+            return find(*thm, previous);
+        }
+
+        auto find(const size_t value) const {
+            return _map.find(value);
+        }
+
+        auto find(const std::string &s) const {
+            return find(std::hash<std::string>{}(s));
+        }
+
+        auto find(const theorem &thm) const {
+            return find(thm.unique_string);
+        }
+
+        auto find(const TheoremPointer &thm) const {
+            return find(*thm);
+        }
+
+        void set(const std::string &s, const T &t, const size_t previous) {
+            _map[combined_hash(s, previous)] = std::pair<T, size_t>(t, previous);
+        }
+
+        void set(const theorem &thm, const T &t, const size_t previous) {
+            set(thm.unique_string, t, previous);
+        }
+
+        void set(const TheoremPointer &thm, const T &t, const size_t previous) {
+            set(*thm, t, previous);
+        }
+
+        bool empty() const noexcept {
+            return _map.empty();
+        }
+
+        static TheoremIncrementalMap<T> from_json(const nlohmann::json &j, T *null_replacement = nullptr) {
+            TheoremIncrementalMap<T> map;
+            for (const auto &[key, value]: j.items()) {
+                size_t key_to_hash = std::stoull(key);
+                if (value.is_null() && null_replacement != nullptr) {
+                    map.insert(key_to_hash, *null_replacement, 0);
+                    continue;
+                }
+                // Value is two elements, value and previous
+                std::pair<nlohmann::json, std::size_t> pair;
+                pair.first = value["value"];
+                pair.second = value["previous"];
+                if constexpr (has_static_from_json<T>::value) {
+                    map.insert(key_to_hash, T::from_json(pair.first), pair.second);
+                } else {
+                    map.insert(key_to_hash, pair.first.get<T>(), pair.second);
+                }
+            }
+            return map;
+        }
+
+        operator nlohmann::json() const {
+            nlohmann::json j;
+            for (const auto &[key, value]: _map) {
+                nlohmann::json inner;
+                inner["value"] = value.first;
+                inner["previous"] = value.second;
+                j[std::to_string(key)] = inner;
             }
             return j;
         }
@@ -1042,12 +1468,12 @@ namespace htps {
         operator nlohmann::json() const {
             nlohmann::json j;
             j["root"] = *root;
-            j["nodes"] = nlohmann::json(nodes);
-            j["ancestors"] = nlohmann::json(ancestors);
-            j["permanent_ancestors"] = nlohmann::json(permanent_ancestors);
-            j["unexplored_theorems"] = nlohmann::json(unexplored_theorems);
-            j["minimum_proof_size"] = nlohmann::json(minimum_proof_size);
-            j["initial_minimum_proof_size"] = nlohmann::json(initial_minimum_proof_size);
+            j["nodes"] = nodes;
+            j["ancestors"] = ancestors;
+            j["permanent_ancestors"] = permanent_ancestors;
+            j["unexplored_theorems"] = unexplored_theorems;
+            j["minimum_proof_size"] = minimum_proof_size;
+            j["initial_minimum_proof_size"] = initial_minimum_proof_size;
             return j;
         }
 

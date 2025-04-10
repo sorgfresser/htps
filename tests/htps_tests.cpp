@@ -647,6 +647,73 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     dump_json_to_file(json2, "samples/test3.json");
 }
 
+/* Within a single proof tree, two sibling branches might face the same theorem at some point.
+ * This case broke on the initial setup, and a regression test was added to prevent this.
+ * Here, tactic 0 is selected from the root node, leading to two children B1 and B2. These two sibling branches
+ * both result in B3. The HTPS has to be able to handle this case.
+ */
+TEST_F(HTPSTest, TestSiblingEquality) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1, child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1, child2}};
+    std::vector<double> priors = {1.0};
+    std::vector<size_t> envDurations = {1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems[1] == child2);
+
+    TheoremPointer child3 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B3"));
+
+    effects.clear();
+    effect->goal = child3;
+    effect->tac = dummyTac2;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child3;
+    effect->tac = dummyTac3;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
+}
+
 
 
 TEST_F(HTPSTest, TestJsonLoading) {

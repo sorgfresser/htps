@@ -13,7 +13,7 @@ static PyObject *make_enum(PyObject *module, PyObject *enum_module, const char *
     PyObject *key, *val, *name_py, *attrs, *args, *modname, *enum_type, *sub_enum_type, *kwargs;
     attrs = PyDict_New();
 
-    for (long i = 0; i < value_size; i++) {
+    for (Py_ssize_t i = 0; i < static_cast<Py_ssize_t>(value_size); i++) {
         key = PyUnicode_FromString(values[i]);
         val = PyLong_FromLong(i);
         PyObject_SetItem(attrs, key, val);

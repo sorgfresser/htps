@@ -46,7 +46,7 @@ namespace htps {
 
         std::shared_ptr<tactic> get_tactic() const;
 
-        void get_children(std::vector<TheoremPointer> &children) const;
+        void set_children(std::vector<TheoremPointer> &children) const;
 
         std::vector<TheoremPointer> get_children() const;
     };
@@ -61,9 +61,9 @@ namespace htps {
         size_t visit_count{};
 
     public:
-        HTPSSampleCritic(TheoremPointer goal, double q_estimate, bool solved, bool bad, double critic,
+        HTPSSampleCritic(const TheoremPointer& goal, double q_estimate, bool solved, bool bad, double critic,
                          size_t visit_count) :
-                goal(std::move(goal)), q_estimate(q_estimate), solved(solved), bad(bad), critic(critic),
+                goal(goal), q_estimate(q_estimate), solved(solved), bad(bad), critic(critic),
                 visit_count(visit_count) {
             assert(q_estimate >= 0);
             assert(q_estimate <= 1 + 1e-4);
@@ -211,24 +211,24 @@ namespace htps {
     // A single simulation of the HTPS algorithm
     class Simulation {
     private:
-        TheoremMap<TheoremPointer> theorems;
-        TheoremMap<size_t> tactic_ids;
-        TheoremMap<std::shared_ptr<tactic>> tactics;
-        TheoremMap<size_t> depth;
-        TheoremMap<std::vector<TheoremPointer>> children_for_theorem;
-        TheoremMap<TheoremPointer> parent_for_theorem;
-        TheoremMap<double> values;
-        TheoremMap<bool> solved;
-        TheoremMap<bool> virtual_count_added;
-        TheoremMap<TheoremSet> seen; // Seen theorems, we immediately free the memory since this can get large
+        TheoremIncrementalMap<TheoremPointer> theorems;
+        TheoremIncrementalMap<size_t> tactic_ids;
+        TheoremIncrementalMap<std::shared_ptr<tactic>> tactics;
+        TheoremIncrementalMap<size_t> depth;
+        TheoremIncrementalMap<std::vector<TheoremPointer>> children_for_theorem;
+        TheoremIncrementalMap<TheoremPointer> parent_for_theorem;
+        TheoremIncrementalMap<double> values;
+        TheoremIncrementalMap<bool> solved;
+        TheoremIncrementalMap<bool> virtual_count_added;
+        TheoremIncrementalMap<TheoremSet> seen; // Seen theorems, we immediately free the memory since this can get large
         TheoremPointer root;
         size_t expansions; // Number of expansions currently awaiting. If it reaches 0, values should be backed up
 
         friend struct std::hash<Simulation>;
     public:
-        std::vector<TheoremPointer> leaves() const;
+        std::vector<std::pair<TheoremPointer, size_t>> leaves() const;
 
-        void leaves(std::vector<TheoremPointer> &leaves) const;
+        void leaves(std::vector<std::pair<TheoremPointer, size_t>> &leaves) const;
 
         size_t leave_count() const;
 
@@ -239,53 +239,57 @@ namespace htps {
         explicit Simulation(TheoremPointer &root)
                 : theorems(), tactic_ids(), tactics(), depth(), children_for_theorem(), parent_for_theorem(),
                   values(), solved(), virtual_count_added(), seen(), root(root), expansions(0) {
-            theorems.insert(root, root);
-            depth.insert(root, 0);
+            theorems.insert(root, root, 0);
+            depth.insert(root, 0, 0);
             TheoremSet thm_set;
             thm_set.insert(root);
-            seen.insert(root, thm_set);
-            parent_for_theorem.insert(root, nullptr);
-            children_for_theorem.insert(root, {});
-            virtual_count_added.insert(root, false);
+            seen.insert(root, thm_set, 0);
+            parent_for_theorem.insert(root, TheoremPointer(), 0);
+            children_for_theorem.insert(root, {}, 0);
+            virtual_count_added.insert(root, false, 0);
         }
 
         Simulation() = default;
 
-        void set_depth(const TheoremPointer &thm, size_t d);
+        size_t get_hash(const TheoremPointer &thm, const size_t &previous) const;
 
-        size_t get_depth(const TheoremPointer &thm) const;
+        size_t get_depth(const TheoremPointer &thm, size_t previous) const;
 
-        bool has_depth(const TheoremPointer &thm) const;
+        bool has_depth(const TheoremPointer &thm, const size_t &previous) const;
 
-        void update_depth(const TheoremPointer &thm, size_t d);
+        void update_depth(const TheoremPointer &thm, size_t d, const size_t &previous);
 
-        void set_value(const TheoremPointer &thm, double v);
+        void set_value(const TheoremPointer &thm, double v, const size_t &previous);
 
-        double get_value(const TheoremPointer &thm) const;
+        double get_value(const size_t &hash_) const;
 
-        bool is_solved(const TheoremPointer &thm) const;
+        double get_value(const TheoremPointer &thm, const size_t &previous) const;
 
-        void set_solved(const TheoremPointer &thm, bool s);
+        bool is_solved(const TheoremPointer &thm, const size_t &previous) const;
 
-        void set_tactic(const TheoremPointer &thm, const std::shared_ptr<tactic> &tac);
+        void set_solved(const TheoremPointer &thm, bool s, const size_t &previous);
 
-        std::shared_ptr<tactic> get_tactic(const TheoremPointer &thm) const;
+        void set_tactic(const TheoremPointer &thm, const std::shared_ptr<tactic> &tac, const size_t &previous);
 
-        void set_tactic_id(const TheoremPointer &thm, size_t id);
+        std::shared_ptr<tactic> get_tactic(const TheoremPointer &thm, const size_t &previous) const;
 
-        size_t get_tactic_id(const TheoremPointer &thm) const;
+        void set_tactic_id(const TheoremPointer &thm, size_t id, const size_t &previous);
 
-        void set_theorem_set(const TheoremPointer &thm, TheoremSet &set);
+        size_t get_tactic_id(const size_t &hash_) const;
 
-        void set_theorem_set(const TheoremPointer &thm, TheoremSet set);
+        size_t get_tactic_id(const TheoremPointer &thm, const size_t &previous) const;
 
-        TheoremSet &get_theorem_set(const TheoremPointer &thm);
+        void set_theorem_set(const TheoremPointer &thm, TheoremSet &set, const size_t &previous);
 
-        void add_theorem(const TheoremPointer &thm, const TheoremPointer &parent, size_t thm_depth);
+        void set_theorem_set(const TheoremPointer &thm, TheoremSet set, const size_t &previous);
 
-        bool erase_theorem_set(const TheoremPointer &thm);
+        TheoremSet &get_theorem_set(const TheoremPointer &thm, const size_t &previous);
 
-        void receive_expansion(const TheoremPointer &thm, double value, bool solved);
+        void add_theorem(const TheoremPointer &thm, const TheoremPointer &parent, const size_t &parent_hash, const size_t thm_depth);
+
+        bool erase_theorem_set(const TheoremPointer &thm, const size_t &previous);
+
+        void receive_expansion(const TheoremPointer &thm, double value, bool is_solved, const size_t &previous);
 
         auto begin() const {
             return theorems.begin();
@@ -295,21 +299,37 @@ namespace htps {
             return theorems.end();
         }
 
-        std::vector<TheoremPointer> get_children(const TheoremPointer &thm) const;
+        bool get_virtual_count_added(const size_t &hash_) const;
 
-        bool get_virtual_count_added(const TheoremPointer &thm) const;
+        bool get_virtual_count_added(const TheoremPointer &thm, const size_t &previous) const;
 
-        void set_virtual_count_added(const TheoremPointer &thm, bool value);
+        void set_virtual_count_added(const TheoremPointer &thm, bool value, const size_t &previous);
 
         bool should_backup() const;
 
-        TheoremPointer parent(const TheoremPointer &thm) const;
+        TheoremPointer parent(const size_t &hash_) const;
 
-        std::vector<double> child_values(const TheoremPointer &thm) const;
+        TheoremPointer parent(const TheoremPointer &thm, const size_t &previous) const;
+
+        std::pair<TheoremPointer, size_t> parent_hash(const size_t &hash_) const;
+
+        std::pair<TheoremPointer, size_t> parent_hash(const TheoremPointer &thm, const size_t &previous) const;
+
+        size_t previous_hash(const size_t &hash_) const;
+
+        std::vector<TheoremPointer> get_children(const size_t &hash_) const;
+
+        std::vector<TheoremPointer> get_children(const TheoremPointer &thm, const size_t &previous) const;
+
+        std::vector<double> child_values(const size_t &hash_) const;
+
+        std::vector<double> child_values(const TheoremPointer &thm, const size_t &previous) const;
 
         void reset_expansions();
 
         void increment_expansions();
+
+        void decrement_expansions();
 
         size_t num_tactics();
 
@@ -330,9 +350,9 @@ struct std::hash<htps::Simulation> {
         std::vector<uint32_t> hashes;
         hashes.reserve(2 * sim.theorems.size());
         for (const auto &[unique_str, thm]: sim) {
-            hashes.push_back(std::hash<htps::theorem>{}(*thm));
-            if (sim.tactics.contains(thm))
-                hashes.push_back(std::hash<htps::tactic>{}(*sim.get_tactic(thm)));
+            hashes.push_back(thm.second);
+            if (sim.tactics.contains(unique_str))
+                hashes.push_back(std::hash<htps::tactic>{}(*sim.tactics.at(unique_str).first));
         }
         return hash_vector(hashes);
     }
@@ -522,7 +542,7 @@ namespace htps {
         htps_params params;
         size_t expansion_count;
         std::vector<std::shared_ptr<Simulation>> simulations; // Currently ongoing simulations. Once a simulation is at 0 awaiting expansions, it is removed
-        TheoremMap<std::vector<std::shared_ptr<Simulation>>> simulations_for_theorem; // The Simulations that need to be adjusted if we receive an expanded theorem
+        TheoremMap<std::vector<std::pair<std::shared_ptr<Simulation>, size_t>>> simulations_for_theorem; // The Simulations that need to be adjusted if we receive an expanded theorem, together with the hash for the leaf that is needed to backup correctly
         std::vector<HTPSSampleEffect> train_samples_effects;
         std::vector<HTPSSampleCritic> train_samples_critic;
         std::vector<HTPSSampleTactics> train_samples_tactics;
@@ -531,8 +551,7 @@ namespace htps {
         bool propagate_needed; // Whether propagation is required. Is set to true whenever find_to_expand fails
         bool done;
 
-        void _single_to_expand(std::vector<TheoremPointer> &theorems, Simulation &sim,
-                               std::vector<TheoremPointer> &leaves_to_expand);
+        void _single_to_expand(std::vector<TheoremPointer> &theorems, Simulation &sim, std::vector<std::pair<TheoremPointer, std::size_t>> &leaves_to_expand);
 
     protected:
         bool is_leaf(const std::shared_ptr<HTPSNode> &node) const;
@@ -590,8 +609,7 @@ namespace htps {
 
         bool is_done() const;
 
-        Simulation find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
-                                         std::vector<TheoremPointer> &to_expand);
+        Simulation find_leaves_to_expand(std::vector<TheoremPointer> &terminal, std::vector<std::pair<TheoremPointer, size_t>> &to_expand);
 
         void expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions);
 

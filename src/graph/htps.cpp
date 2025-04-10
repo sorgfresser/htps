@@ -835,7 +835,7 @@ std::size_t std::hash<HTPSNode>::operator()(const HTPSNode &n) const {
 }
 
 bool HTPS::is_leaf(const std::shared_ptr<htps::HTPSNode> &node) const {
-    return node->is_solved() && !(is_proven()) && (params.early_stopping_solved_if_root_not_proven);
+    return node->is_solved() && (!is_proven()) && params.early_stopping_solved_if_root_not_proven;
 }
 
 void HTPS::find_unexplored_and_propagate_expandable() {
@@ -945,7 +945,14 @@ Simulation HTPS::find_leaves_to_expand(std::vector<TheoremPointer> &terminal,
         auto HTPS_node = nodes.at(current);
         bool is_leaf_node = is_leaf(HTPS_node);
         if (HTPS_node->is_terminal() || is_leaf_node) {
-            assert(HTPS_node->is_solved() || is_leaf_node);
+#ifdef VERBOSE_PRINTS
+            if (HTPS_node->is_terminal())
+                printf("Terminal node\n");
+            else
+                printf("Leaf node\n");
+            printf("Tactics size: %zu\n", HTPS_node->n_tactics());
+#endif
+            assert(HTPS_node->is_solved_leaf_node() || is_leaf_node);
             sim.set_value(current, HTPS_node->get_value(), previous);
             sim.set_solved(current, true, previous);
             terminal.push_back(current);

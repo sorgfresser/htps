@@ -1837,7 +1837,7 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
         }
     }
     // Try the error one
-
+    PyErr_Clear();
     PyObject *py_error = NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OkkOO", const_cast<char **>(kwlist_error),
                                      &py_thm, &expander_duration, &generation_duration, &py_env_durations, &py_error)) {

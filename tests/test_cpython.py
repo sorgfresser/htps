@@ -261,6 +261,23 @@ def test_env_expansion():
     assert expansion.error is None, "error field should be None"
     assert expansion.is_error == False, "is_error should be False"
 
+def test_env_expansion_errorneous():
+    context = Context(["∧", "", " "])
+    hypotheses = [Hypothesis("H1", "A"),Hypothesis("H2", "B"),Hypothesis("H3", "C"),Hypothesis("H4", "D")]
+    tactic_a = Tactic("tac_a", True, 5)
+    tactic_b = Tactic("tac_b", True, 10)
+    tactic_c = Tactic("tac_c", True, 15)
+    tactics = [tactic_a, tactic_b, tactic_c]
+
+    goal = Theorem("goal_conclusion", "goal_unique", hypotheses, context, tactics)
+    goal.metadata = {"test": 1}
+    with pytest.raises(TypeError):
+        expansion = EnvExpansion(goal, 10, 5, [], None)
+    expansion = EnvExpansion(goal, 10, 5, [], "This is a test!")
+    expansion = EnvExpansion(goal, 10, 5, [1,1,1], "This is a test!")
+
+
+
 def test_htps_sample_effect():
     context = Context(["∧", "", " "])
     hypotheses = [Hypothesis("H1", "A"), Hypothesis("H2", "B"), Hypothesis("H3", "C"), Hypothesis("H4", "D")]

@@ -1055,7 +1055,6 @@ void HTPS::receive_expansion(TheoremPointer &thm, double value, bool solved) {
     // Compare via reference, not pointer
     std::unordered_set<std::shared_ptr<Simulation>> sims{};
     for (const auto &[simulation, previous]: simulations_for_theorem.at(thm)) {
-        // Need parent hash
         simulation->receive_expansion(thm, value, solved, previous);
         sims.insert(simulation);
     }

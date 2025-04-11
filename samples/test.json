@@ -1,18 +1,35 @@
 {
   "ancestors": {
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-      "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-    },
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-      "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0
-    },
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-      "": 0
-    }
+    "A": [
+      [
+        "",
+        0
+      ]
+    ],
+    "B": [
+      [
+        "A",
+        1
+      ],
+      [
+        "A",
+        0
+      ]
+    ],
+    "C": [
+      [
+        "B",
+        1
+      ],
+      [
+        "B",
+        0
+      ]
+    ]
   },
   "backedup_hashes": [],
   "currently_expanding": [
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+    "C"
   ],
   "done": false,
   "expansion_count": 2,
@@ -31,24 +48,24 @@
       "children_for_tactic": [
         [
           {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
+            "conclusion": "C",
             "ctx": {
               "namespaces": []
             },
             "hypotheses": [],
             "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+            "unique_string": "C"
           }
         ],
         [
           {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
+            "conclusion": "C",
             "ctx": {
               "namespaces": []
             },
             "hypotheses": [],
             "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+            "unique_string": "C"
           }
         ]
       ],
@@ -110,22 +127,22 @@
         {
           "duration": 0,
           "is_valid": true,
-          "unique_string": "intro a b"
+          "unique_string": "TACC"
         },
         {
           "duration": 0,
           "is_valid": true,
-          "unique_string": "intro b a"
+          "unique_string": "TACD"
         }
       ],
       "theorem": {
-        "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
+        "conclusion": "B",
         "ctx": {
           "namespaces": []
         },
         "hypotheses": [],
         "past_tactics": [],
-        "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "unique_string": "B"
       },
       "virtual_counts": [
         0,
@@ -136,30 +153,30 @@
       "children_for_tactic": [
         [
           {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
+            "conclusion": "B",
             "ctx": {
               "namespaces": []
             },
             "hypotheses": [],
             "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+            "unique_string": "B"
           }
         ],
         [
           {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
+            "conclusion": "B",
             "ctx": {
               "namespaces": []
             },
             "hypotheses": [],
             "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+            "unique_string": "B"
           }
         ]
       ],
       "counts": [
-        3,
-        0
+        2,
+        1
       ],
       "exploration": 0.3,
       "in_minimum_proof": {
@@ -172,8 +189,8 @@
       "killed_tactics": [],
       "log_critic_value": -0.5,
       "log_w": [
-        0.5885619528146082,
-        0.0
+        0.18309684470644383,
+        -0.5100503358535015
       ],
       "minimum_proof_size": {
         "DEPTH": 9223372036854775807,
@@ -202,7 +219,7 @@
       "q_value_solved": 2,
       "reset_mask": [
         false,
-        true
+        false
       ],
       "solved": false,
       "solving_tactics": [],
@@ -215,22 +232,22 @@
         {
           "duration": 0,
           "is_valid": true,
-          "unique_string": "intro a b"
+          "unique_string": "TACA"
         },
         {
           "duration": 0,
           "is_valid": true,
-          "unique_string": "intro b a"
+          "unique_string": "TACB"
         }
       ],
       "theorem": {
-        "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
+        "conclusion": "A",
         "ctx": {
           "namespaces": []
         },
         "hypotheses": [],
         "past_tactics": [],
-        "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "unique_string": "A"
       },
       "virtual_counts": [
         0,
@@ -263,15 +280,32 @@
     "virtual_loss": 0
   },
   "permanent_ancestors": {
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-      "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-    },
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-      "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0
-    },
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-      "": 0
-    }
+    "A": [
+      [
+        "",
+        0
+      ]
+    ],
+    "B": [
+      [
+        "A",
+        1
+      ],
+      [
+        "A",
+        0
+      ]
+    ],
+    "C": [
+      [
+        "B",
+        1
+      ],
+      [
+        "B",
+        0
+      ]
+    ]
   },
   "policy": {
     "exploration": 0.3,
@@ -279,717 +313,540 @@
   },
   "propagate_needed": false,
   "root": {
-    "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
+    "conclusion": "A",
     "ctx": {
       "namespaces": []
     },
     "hypotheses": [],
     "past_tactics": [],
-    "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+    "unique_string": "A"
   },
+  "seed": 42,
   "simulations": [
     {
       "children_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          }
-        ],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          }
-        ]
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": []
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": [
+            {
+              "conclusion": "B",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "B"
+            }
+          ]
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": [
+            {
+              "conclusion": "C",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "C"
+            }
+          ]
+        }
       },
       "depth": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": 2
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "expansions": 1,
       "parent_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": null
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
+        }
       },
       "root": {
-        "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
+        "conclusion": "A",
         "ctx": {
           "namespaces": []
         },
         "hypotheses": [],
         "past_tactics": [],
-        "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "unique_string": "A"
       },
       "seen": null,
       "solved": null,
       "tactic_ids": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "tactics": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACA"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACD"
+          }
         }
       },
       "theorems": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "C",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "C"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         }
       },
       "values": null,
       "virtual_count_added": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": false
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": true
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": true
+        }
       }
     },
     {
       "children_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          }
-        ],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          }
-        ]
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": []
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": [
+            {
+              "conclusion": "B",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "B"
+            }
+          ]
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": [
+            {
+              "conclusion": "C",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "C"
+            }
+          ]
+        }
       },
       "depth": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": 2
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "expansions": 1,
       "parent_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": null
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
+        }
       },
       "root": {
-        "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
+        "conclusion": "A",
         "ctx": {
           "namespaces": []
         },
         "hypotheses": [],
         "past_tactics": [],
-        "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "unique_string": "A"
       },
       "seen": null,
       "solved": null,
       "tactic_ids": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "tactics": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACA"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACD"
+          }
         }
       },
       "theorems": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "C",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "C"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         }
       },
       "values": null,
       "virtual_count_added": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": false
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": true
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": true
+        }
       }
     },
     {
       "children_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          }
-        ],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-          {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          }
-        ]
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": []
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": [
+            {
+              "conclusion": "B",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "B"
+            }
+          ]
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": [
+            {
+              "conclusion": "C",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "C"
+            }
+          ]
+        }
       },
       "depth": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": 2
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "expansions": 1,
       "parent_for_theorem": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": null
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
+        }
       },
       "root": {
-        "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
+        "conclusion": "A",
         "ctx": {
           "namespaces": []
         },
         "hypotheses": [],
         "past_tactics": [],
-        "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "unique_string": "A"
       },
       "seen": null,
       "solved": null,
       "tactic_ids": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
+        "18320048000645225891": {
+          "previous": 0,
+          "value": 0
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": 1
+        }
       },
       "tactics": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACA"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "duration": 0,
-          "is_valid": true,
-          "unique_string": "intro a b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACD"
+          }
         }
       },
       "theorems": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": {
+            "conclusion": "C",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "C"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
+        "18320048000645225891": {
+          "previous": 0,
+          "value": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          }
         },
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          }
         }
       },
       "values": null,
       "virtual_count_added": {
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-        "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
+        "10889152000119721715": {
+          "previous": 6464347430033935242,
+          "value": false
+        },
+        "18320048000645225891": {
+          "previous": 0,
+          "value": true
+        },
+        "6464347430033935242": {
+          "previous": 18320048000645225891,
+          "value": true
+        }
       }
     }
   ],
   "simulations_for_theorem": {
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [
-      {
-        "children_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-            }
-          ],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-            }
-          ]
-        },
-        "depth": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "expansions": 1,
-        "parent_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
-        },
-        "root": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-        },
-        "seen": null,
-        "solved": null,
-        "tactic_ids": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "tactics": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          }
-        },
-        "theorems": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          }
-        },
-        "values": null,
-        "virtual_count_added": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
-        }
-      },
-      {
-        "children_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-            }
-          ],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-            }
-          ]
-        },
-        "depth": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "expansions": 1,
-        "parent_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
-        },
-        "root": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-        },
-        "seen": null,
-        "solved": null,
-        "tactic_ids": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "tactics": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          }
-        },
-        "theorems": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          }
-        },
-        "values": null,
-        "virtual_count_added": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
-        }
-      },
-      {
-        "children_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-            }
-          ],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": [],
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": [
-            {
-              "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-              "ctx": {
-                "namespaces": []
-              },
-              "hypotheses": [],
-              "past_tactics": [],
-              "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-            }
-          ]
-        },
-        "depth": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 1,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": 2,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "expansions": 1,
-        "parent_for_theorem": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": null
-        },
-        "root": {
-          "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-          "ctx": {
-            "namespaces": []
-          },
-          "hypotheses": [],
-          "past_tactics": [],
-          "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-        },
-        "seen": null,
-        "solved": null,
-        "tactic_ids": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": 0,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": 0
-        },
-        "tactics": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "duration": 0,
-            "is_valid": true,
-            "unique_string": "intro a b"
-          }
-        },
-        "theorems": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c"
-          },
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": {
-            "conclusion": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b",
-            "ctx": {
-              "namespaces": []
-            },
-            "hypotheses": [],
-            "past_tactics": [],
-            "unique_string": "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
-          }
-        },
-        "values": null,
-        "virtual_count_added": {
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = b": true,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\na b : S\n⊢ a * (b * a) = c": false,
-          "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b": true
-        }
-      }
-    ]
+    "C": []
   },
   "unexplored_theorems": [
-    "S : Type u_1\ninst✝ : Mul S\nhS : ∀ (a b : S), a * b * a = b\n⊢ ∀ (a b : S), a * (b * a) = b"
+    "A"
   ]
 }

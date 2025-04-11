@@ -1838,7 +1838,7 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 return -1;
             }
             double sum = std::accumulate(priors.begin(), priors.end(), 0.0);
-            if (sum < 0.99 || sum > 1.01) {
+            if ((sum < 0.99 || sum > 1.01) && !priors.empty()) {
                 PyErr_SetString(PyExc_ValueError, "priors must sum to 1");
                 return -1;
             }

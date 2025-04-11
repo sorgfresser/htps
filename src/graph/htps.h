@@ -385,7 +385,7 @@ namespace htps {
         std::vector<size_t> counts; // Total action count
         std::vector<size_t> virtual_counts;
         std::vector<bool> reset_mask; // Indicates whether logW should be reset, i.e. new values override old ones
-
+        bool error = false;
 
         void get_tactics_sample_q_conditioning(size_t count_threshold,
                                                std::vector<std::shared_ptr<tactic>> &valid_tactics,
@@ -405,11 +405,11 @@ namespace htps {
                  const std::shared_ptr<Policy> &policy, const std::vector<double> &priors,
                  const double exploration, const double log_critic_value, const QValueSolved q_value_solved,
                  const double tactic_init_value,
-                 const std::vector<std::shared_ptr<env_effect>> &effects) :
+                 const std::vector<std::shared_ptr<env_effect>> &effects, const bool error = false) :
                 Node(thm, tactics, children_for_tactic), old_critic_value(0.0), log_critic_value(log_critic_value),
                 priors(priors), q_value_solved(q_value_solved), effects(effects), policy(policy), exploration(exploration),
                 tactic_init_value(tactic_init_value), log_w(tactics.size()), counts(), virtual_counts(),
-                reset_mask(tactics.size()) {
+                reset_mask(tactics.size()), error(error) {
             assert(_validate());
             reset_HTPS_stats();
         }
@@ -425,7 +425,8 @@ namespace htps {
                   exploration(node.exploration),
                   tactic_init_value(node.tactic_init_value),
                   log_w(node.log_w),
-                  reset_mask(node.reset_mask) {
+                  reset_mask(node.reset_mask),
+                  error(node.error) {
             assert(_validate());
             reset_HTPS_stats();
         }

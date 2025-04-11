@@ -964,6 +964,24 @@ TEST_F(HTPSTest, TestMultipleSame) {
     search2.get_result();
 }
 
+TEST_F(HTPSTest, TestErrorExpansion) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    std::vector<size_t> envDurations = {1, 1};
+    std::string error = "This is broken!";
+    htps::env_expansion expansion(root, 1, 1, envDurations, error);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+}
+
 
 TEST_F(HTPSTest, TestJsonLoading) {
     auto j = load_json_from_file("samples/test.json");

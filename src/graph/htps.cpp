@@ -425,6 +425,10 @@ std::size_t Simulation::previous_hash(const size_t &hash_) const {
 
 
 void HTPSNode::reset_HTPS_stats() {
+    if (error) {
+        assert (tactics.empty());
+        return;
+    }
     // implies we will simply set logW to the first value we receive
     reset_mask = std::vector<bool>(tactics.size(), true);
     counts = std::vector<size_t>(tactics.size(), 0);
@@ -432,6 +436,8 @@ void HTPSNode::reset_HTPS_stats() {
 }
 
 bool HTPSNode::should_send(size_t count_threshold) const {
+    if (error)
+        return false;
     if (solved) {
         return true;
     }
@@ -726,11 +732,20 @@ bool HTPSNode::_validate() const {
         return false;
     if (q_value_solved == QValueSolvedCount)
         return false;
-    if (tactics.empty())
-        return false;
     if (children_for_tactic.size() != tactics.size())
         return false;
     if (children_for_tactic.size() != priors.size())
+        return false;
+    if (error) {
+        if (log_critic_value > MIN_FLOAT)
+            return false;
+        if (is_solved_leaf || solved)
+            return false;
+        if (!tactics.empty())
+            return false;
+        return true;
+    }
+    if (tactics.empty())
         return false;
     if (log_critic_value > 0.0)
         return false;
@@ -1075,7 +1090,7 @@ void HTPS::expand(std::vector<std::shared_ptr<env_expansion>> &expansions) {
 #endif
             HTPSNode current = HTPSNode(
                     expansion->thm, {}, {}, policy, {}, params.exploration, MIN_FLOAT,
-                    params.q_value_solved, params.tactic_init_value, expansion->effects);
+                    params.q_value_solved, params.tactic_init_value, expansion->effects, true);
             receive_expansion(expansion->thm, MIN_FLOAT, false);
             nodes.push_back(current);
             continue;

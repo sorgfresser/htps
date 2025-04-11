@@ -980,6 +980,57 @@ TEST_F(HTPSTest, TestErrorExpansion) {
     expansions.clear();
 
     auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+}
+
+/* If we are given varying times, some values will come before the others.
+ * Specifically, we expect smaller times to come first. This test tries this and asserts
+ * that this is indeed the case
+ */
+TEST_F(HTPSTest, TestBuildMinProofProven) {
+    auto params = dummyParams;
+    params.metric = Metric::TIME;
+    htps_instance->set_params(params);
+
+    htps_instance->theorems_to_expand();
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    // Make tactic 1 take longer than tactic 2
+    dummyTac->duration = 100;
+    effect->tac = dummyTac;
+    effect->children = {};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{}, {}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {2, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult res = htps_instance->get_result();
+    proof p = res.get_proof().value();
+    // Tac 2 should be part of the min proof, because it has smaller duration
+    EXPECT_TRUE(p.proof_tactic == dummyTac2);
 }
 
 
@@ -998,18 +1049,21 @@ TEST_F(HTPSTest, TestJsonExpectations) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
 
-    auto j = load_json_from_file("samples/search.json");
+    auto j = load_json_from_file("samples/search_6.json");
 
     HTPS search = htps::HTPS::from_json(j);
     EXPECT_FALSE(search.is_done());
 
-    for (size_t index = 1; index < 3; index++) {
+    for (size_t index = 6; index < 7; index++) {
         j = load_json_from_file("samples/expansions_" + std::to_string(index) + ".json");
         std::vector<std::shared_ptr<htps::env_expansion>> expansions;
         for (auto &expansion: j) {
             expansions.push_back(std::make_shared<htps::env_expansion>(htps::env_expansion::from_json(expansion)));
         }
-        auto theorems = search.theorems_to_expand();
+//        auto theorems = search.theorems_to_expand();
         search.expand_and_backup(expansions);
+        auto theorems = search.theorems_to_expand();
     }
+//    auto theorems = search.theorems_to_expand();
+//    auto result = search.get_result();
 }

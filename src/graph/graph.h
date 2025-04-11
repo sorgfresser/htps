@@ -555,6 +555,10 @@ namespace htps {
         bool operator<(const PrioritizedNode &other) const {
             return priority < other.priority;
         }
+
+        bool operator>(const PrioritizedNode &other) const {
+            return priority > other.priority;
+        }
     };
 
 
@@ -1872,7 +1876,7 @@ namespace htps {
                     }
                 }
 
-                std::priority_queue<PT> pq(to_process.begin(), to_process.end());
+                std::priority_queue<PT, std::vector<PT>, std::greater<PT>> pq(to_process.begin(), to_process.end());
                 // Set minimum length for each node that has a minimum length
                 while (!pq.empty()) {
                     PT pnode = pq.top();

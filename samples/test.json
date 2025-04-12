@@ -73,6 +73,63 @@
         0,
         0
       ],
+      "effects": [
+        {
+          "children": [
+            {
+              "conclusion": "C",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "C"
+            }
+          ],
+          "goal": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          },
+          "tac": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACC"
+          }
+        },
+        {
+          "children": [
+            {
+              "conclusion": "C",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "C"
+            }
+          ],
+          "goal": {
+            "conclusion": "B",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "B"
+          },
+          "tac": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACD"
+          }
+        }
+      ],
+      "error": false,
       "exploration": 0.3,
       "in_minimum_proof": {
         "DEPTH": false,
@@ -178,6 +235,63 @@
         2,
         1
       ],
+      "effects": [
+        {
+          "children": [
+            {
+              "conclusion": "B",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "B"
+            }
+          ],
+          "goal": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          },
+          "tac": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACA"
+          }
+        },
+        {
+          "children": [
+            {
+              "conclusion": "B",
+              "ctx": {
+                "namespaces": []
+              },
+              "hypotheses": [],
+              "past_tactics": [],
+              "unique_string": "B"
+            }
+          ],
+          "goal": {
+            "conclusion": "A",
+            "ctx": {
+              "namespaces": []
+            },
+            "hypotheses": [],
+            "past_tactics": [],
+            "unique_string": "A"
+          },
+          "tac": {
+            "duration": 0,
+            "is_valid": true,
+            "unique_string": "TACB"
+          }
+        }
+      ],
+      "error": false,
       "exploration": 0.3,
       "in_minimum_proof": {
         "DEPTH": false,

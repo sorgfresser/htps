@@ -19,9 +19,9 @@ namespace htps {
 #ifdef PYTHON_BINDINGS
         PyObject_HEAD
 #endif
-        std::shared_ptr<theorem> goal;
+        TheoremPointer goal;
         std::shared_ptr<tactic> tac;
-        std::vector<std::shared_ptr<theorem>> children;
+        std::vector<TheoremPointer> children;
 
         operator nlohmann::json() const {
             nlohmann::json j;
@@ -33,11 +33,11 @@ namespace htps {
 
         static env_effect from_json(const nlohmann::json &j) {
             env_effect e;
-            e.goal = std::make_shared<theorem>(theorem::from_json(j["goal"]));
-            e.tac = std::make_shared<tactic>(tactic::from_json(j["tac"]));
-            std::vector<std::shared_ptr<theorem>> children;
+            e.goal = j["goal"];
+            e.tac = j["tac"];
+            std::vector<TheoremPointer> children;
             for (const auto &child: j["children"]) {
-                children.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+                children.push_back(child);
             }
             e.children = children;
             return e;
@@ -45,14 +45,14 @@ namespace htps {
     };
 
     struct env_expansion {
-        std::shared_ptr<theorem> thm;
+        TheoremPointer thm;
         size_t expander_duration;
         size_t generation_duration;
         std::vector<size_t> env_durations;
         std::vector<std::shared_ptr<env_effect>> effects;
         double log_critic;
         std::vector<std::shared_ptr<tactic>> tactics;
-        std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+        std::vector<std::vector<TheoremPointer>> children_for_tactic;
         std::vector<double> priors;
         std::optional<std::string> error;
 
@@ -61,15 +61,15 @@ namespace htps {
         }
         env_expansion() = default;
 
-        env_expansion(std::shared_ptr<theorem> &thm, size_t expander_duration, size_t generation_duration,
+        env_expansion(TheoremPointer &thm, size_t expander_duration, size_t generation_duration,
                       std::vector<size_t> &env_durations, std::string &error) :
                 thm(thm), expander_duration(expander_duration), generation_duration(generation_duration),
                 env_durations(env_durations), log_critic(MIN_FLOAT), error(error) {}
 
-        env_expansion(std::shared_ptr<theorem> &thm, size_t expander_duration, size_t generation_duration,
+        env_expansion(TheoremPointer &thm, size_t expander_duration, size_t generation_duration,
                       std::vector<size_t> &env_durations, std::vector<std::shared_ptr<env_effect>> &effects,
                       double log_critic, std::vector<std::shared_ptr<tactic>> &tactics,
-                      std::vector<std::vector<std::shared_ptr<theorem>>> &children_for_tactic,
+                      std::vector<std::vector<TheoremPointer>> &children_for_tactic,
                       std::vector<double> &priors) :
                 thm(thm), expander_duration(expander_duration), generation_duration(generation_duration),
                 env_durations(env_durations), effects(effects), log_critic(log_critic), tactics(tactics),
@@ -109,7 +109,7 @@ namespace htps {
         }
 
         static env_expansion from_json(const nlohmann::json &j) {
-            std::shared_ptr<theorem> thm = std::make_shared<theorem>(theorem::from_json(j["thm"]));
+            TheoremPointer thm = j["thm"];
             size_t expander_duration = j["expander_duration"];
             size_t generation_duration = j["generation_duration"];
             std::vector<size_t> env_durations = j["env_durations"];
@@ -120,18 +120,18 @@ namespace htps {
 
             std::vector<std::shared_ptr<env_effect>> effects;
             for (const auto &effect: j["effects"]) {
-                effects.push_back(std::make_shared<env_effect>(env_effect::from_json(effect)));
+                effects.push_back(effect);
             }
             double log_critic = j["log_critic"];
             std::vector<std::shared_ptr<tactic>> tactics;
             for (const auto &tac: j["tactics"]) {
-                tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+                tactics.push_back(tac);
             }
-            std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+            std::vector<std::vector<TheoremPointer>> children_for_tactic;
             for (const auto &children: j["children_for_tactic"]) {
-                std::vector<std::shared_ptr<theorem>> children_json;
+                std::vector<TheoremPointer> children_json;
                 for (const auto &child: children) {
-                    children_json.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+                    children_json.push_back(child);
                 }
                 children_for_tactic.push_back(children_json);
             }

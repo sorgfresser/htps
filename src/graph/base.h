@@ -12,6 +12,7 @@
 #include <memory>
 #include <set>
 #include <any>
+#include <type_traits>
 #include "../json.hpp"
 
 namespace htps {
@@ -40,9 +41,6 @@ struct std::hash<htps::tactic> {
 
 namespace htps {
     struct hypothesis {
-#ifdef PYTHON_BINDINGS
-        PyObject_HEAD
-#endif
         std::string identifier;
         std::string type;
 
@@ -75,15 +73,12 @@ namespace htps {
     };
 
     struct theorem {
-#ifdef PYTHON_BINDINGS
-        PyObject_HEAD
-#endif
         std::string conclusion;
         std::vector<hypothesis> hypotheses;
         std::string unique_string;
         context ctx;
         std::vector<tactic> past_tactics;
-        std::unordered_map<std::string, std::any> metadata;
+        std::any metadata;
 
         theorem() = default;
 
@@ -146,15 +141,32 @@ struct std::hash<htps::theorem> {
 //    }
 //};
 
-template<>
-struct std::hash<std::pair<std::shared_ptr<htps::theorem>, size_t>> {
-    std::size_t operator()(const std::pair<std::shared_ptr<htps::theorem>, size_t> &p) const;
-};
-
 namespace htps {
+    class TheoremPointer : public std::shared_ptr<htps::theorem> {
+    public:
+        using std::shared_ptr<htps::theorem>::shared_ptr;
+
+        TheoremPointer(const std::shared_ptr<htps::theorem>& p)
+                : std::shared_ptr<htps::theorem>(p) {}
+
+        ~TheoremPointer() {
+            if (operator bool() && this->get()->metadata.has_value()) {
+#ifdef PYTHON_BINDINGS
+                if (this->use_count() == 1) {
+                    try {
+                        auto py_metadata = std::any_cast<PyObject *>(this->get()->metadata);
+                        Py_XDECREF(py_metadata);
+                    }
+                    catch (std::bad_any_cast &e) {
+                    }
+                }
+#endif
+            }
+        }
+    };
 
     struct proof {
-        std::shared_ptr<theorem> proof_theorem;
+        TheoremPointer proof_theorem;
         std::shared_ptr<tactic> proof_tactic;
         std::vector<proof> children;
 
@@ -164,8 +176,16 @@ namespace htps {
     };
 }
 
-namespace nlohmann
-{
+namespace nlohmann {
+    namespace {
+        template <typename T, typename = void>
+        struct has_static_from_json : std::false_type {};
+
+        template <typename T>
+        struct has_static_from_json<T, std::void_t<decltype(T::from_json(std::declval<const json&>()))>>
+                : std::true_type {};
+    }
+
     template <typename T>
     struct adl_serializer<std::shared_ptr<T>>
     {
@@ -185,11 +205,46 @@ namespace nlohmann
         {
             if (j.is_null()) {
                 opt = nullptr;
+            } else {
+                if constexpr (has_static_from_json<T>::value) {
+                    opt = std::make_shared<T>(T::from_json(j));
+                } else {
+                    opt = std::make_shared<T>(j.get<T>());
+                }
+            }
+        }
+    };
+
+    template<>
+    struct adl_serializer<htps::TheoremPointer>
+    {
+        static void to_json(json& j, const htps::TheoremPointer& opt)
+        {
+            if (opt)
+            {
+                j = *opt;
+            }
+            else
+            {
+                j = nullptr;
+            }
+        }
+
+        static void from_json(const json& j, htps::TheoremPointer& opt)
+        {
+            if (j.is_null()) {
+                opt = nullptr;
             }
             else {
-                opt = std::make_shared<T>(j.get<T>());
+                opt = std::make_shared<htps::theorem>(htps::theorem::from_json(j));
             }
         }
     };
 }
+
+template<>
+struct std::hash<std::pair<htps::TheoremPointer, size_t>> {
+    std::size_t operator()(const std::pair<htps::TheoremPointer, size_t> &p) const;
+};
+
 #endif // HTPS_BASE_H

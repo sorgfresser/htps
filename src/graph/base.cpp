@@ -115,8 +115,8 @@ theorem::operator nlohmann::json() const {
 
 proof proof::from_json(const nlohmann::json &j) {
     proof p;
-    p.proof_theorem = std::make_shared<theorem>(theorem::from_json(j["proof_theorem"]));
-    p.proof_tactic = std::make_shared<tactic>(tactic::from_json(j["proof_tactic"]));
+    p.proof_theorem = j["proof_theorem"];
+    p.proof_tactic = j["proof_tactic"];
     std::vector<proof> children;
     for (const auto &child: j["children"]) {
         children.push_back(proof::from_json(child));
@@ -137,8 +137,8 @@ std::size_t std::hash<theorem>::operator()(const theorem &t) const {
     return std::hash<std::string>{}(t.unique_string);
 }
 
-std::size_t std::hash<std::pair<std::shared_ptr<htps::theorem>, size_t> >::operator()(
-    const std::pair<std::shared_ptr<htps::theorem>, size_t> &p) const {
+std::size_t std::hash<std::pair<htps::TheoremPointer, size_t> >::operator()(
+    const std::pair<htps::TheoremPointer, size_t> &p) const {
     const auto second_hash = std::hash<size_t>{}(p.second);
     const auto first = p.first;
     const auto first_hash = first ? std::hash<htps::theorem>{}(*first) : 0;

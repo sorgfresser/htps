@@ -12,6 +12,29 @@
 
 using namespace htps;
 
+nlohmann::json load_json_from_file(const std::string &filename) {
+    std::ifstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    nlohmann::json j = nlohmann::json::parse(file);
+    return j;
+}
+
+void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    // Dump JSON object to the file with an indent of 4 spaces.
+    file << j.dump(4);
+
+    if (!file.good()) {
+        throw std::runtime_error("Error writing to file: " + filename);
+    }
+}
+
 class DummyTheorem : public theorem {
 public:
     DummyTheorem(const std::string &conclusion,
@@ -51,7 +74,7 @@ public:
 
 class HTPSTest : public ::testing::Test {
 protected:
-    std::shared_ptr<struct theorem> root;
+    TheoremPointer root;
     std::unique_ptr<HTPS> htps_instance;
     std::shared_ptr<DummyTactic> dummyTac;
     std::shared_ptr<DummyTactic> dummyTac2;
@@ -102,7 +125,7 @@ TEST_F(HTPSTest, ExpansionSolvedTest) {
 
     // Create a dummy env_expansion representing a solved expansion.
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{}};
     std::vector<double> priors = {1.0};
     std::vector<size_t> envDurations = {1};
 
@@ -119,7 +142,7 @@ TEST_F(HTPSTest, ExpansionSolvedTest) {
 TEST_F(HTPSTest, TheoremsToExpandTest) {
     // Prepare the instance with a solved root to force an expansion.
     // For this test, call batch_to_expand and verify that the returned list is not empty.
-    std::vector<std::shared_ptr<htps::theorem>> toExpand = htps_instance->theorems_to_expand();
+    std::vector<htps::TheoremPointer> toExpand = htps_instance->theorems_to_expand();
     EXPECT_FALSE(toExpand.empty());
     // In our minimal instance the root should be among the theorems to expand.
     bool found = false;
@@ -145,7 +168,7 @@ TEST_F(HTPSTest, GetResultImmediatelySolvedTest) {
     effects.push_back(effect);
 
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{}};
     std::vector<double> priors = {1.0};
     std::vector<size_t> envDurations = {1};
 
@@ -159,7 +182,7 @@ TEST_F(HTPSTest, GetResultImmediatelySolvedTest) {
     htps::HTPSResult result = htps_instance->get_result();
 
     // Verify that the proof in the result has the root theorem.
-    EXPECT_EQ(result.get_proof().proof_theorem->unique_string, root->unique_string);
+    EXPECT_EQ(result.get_proof().value().proof_theorem->unique_string, root->unique_string);
     // Other result components like samples can be checked for non-emptiness.
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
     EXPECT_FALSE(samples_critic.empty());
@@ -174,7 +197,7 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     htps_instance->theorems_to_expand();
 
     // Create children for the root theorem.
-    std::vector<std::shared_ptr<htps::theorem>> children;
+    std::vector<htps::TheoremPointer> children;
     for (int i = 0; i < 3; i++) {
         auto child = std::make_shared<DummyTheorem>("B" + std::to_string(i));
         children.push_back(child);
@@ -191,7 +214,7 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
 
     // Create a dummy env_expansion representing an unsolved expansion.
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {children};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {children};
     std::vector<double> priors = {1.0};
     std::vector<size_t> envDurations = {1};
 
@@ -238,7 +261,7 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
 
     // Create a dummy env_expansion representing a solved expansion.
     std::vector<std::shared_ptr<htps::tactic>> tactics_child = {dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic_child = {{}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic_child = {{}};
     std::vector<double> priors_child = {1.0};
     std::vector<size_t> envDurations_child = {1};
 
@@ -297,18 +320,18 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
 
     // Create a dummy env_expansion representing a solved expansion.
     std::vector<std::shared_ptr<htps::tactic>> tactics_grandchildren = {dummyTac2};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic_grandchildren = {{}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic_grandchildren = {{}};
     std::vector<double> priors_grandchildren = {1.0};
     std::vector<size_t> envDurations_grandchildren = {1};
     effects_grandchildren = {effect_child3};
-    auto child3_ptr = static_cast<std::shared_ptr<htps::theorem>>(child3);
+    auto child3_ptr = static_cast<htps::TheoremPointer>(child3);
     htps::env_expansion expansion_grandchild(child3_ptr, 1, 1, envDurations_grandchildren, effects_grandchildren, 0.0,
                                              tactics_grandchildren, childrenForTactic_grandchildren,
                                              priors_grandchildren);
     std::vector<std::shared_ptr<htps::env_expansion>> expansions_grandchildren = {
             std::make_shared<htps::env_expansion>(expansion_grandchild)};
     effects_grandchildren = {effect_child4};
-    auto child4_ptr = static_cast<std::shared_ptr<htps::theorem>>(child4);
+    auto child4_ptr = static_cast<htps::TheoremPointer>(child4);
     htps::env_expansion expansion_grandchild2(child4_ptr, 1, 1, envDurations_grandchildren, effects_grandchildren, 0.0,
                                               tactics_grandchildren, childrenForTactic_grandchildren,
                                               priors_grandchildren);
@@ -327,7 +350,7 @@ TEST_F(HTPSTest, ExpansionMultiTest) {
     EXPECT_TRUE(result.get_goal() == root);
 
     // Check proof
-    struct proof p = result.get_proof();
+    struct proof p = result.get_proof().value();
     EXPECT_TRUE(p.proof_theorem == root);
     EXPECT_TRUE(p.proof_tactic ==dummyTac);
     auto p_children = p.children;
@@ -373,7 +396,7 @@ TEST_F(HTPSTest, TestBackupOnce) {
 
     htps_instance->theorems_to_expand();
     // Create children for the root theorem.
-    std::vector<std::shared_ptr<htps::theorem>> children;
+    std::vector<htps::TheoremPointer> children;
     for (int i = 0; i < 2; i++) {
         auto child = std::make_shared<DummyTheorem>("B");
         children.push_back(child);
@@ -393,7 +416,7 @@ TEST_F(HTPSTest, TestBackupOnce) {
     effects.push_back(effect);
 
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{children[0]}, {children[1]}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{children[0]}, {children[1]}};
     std::vector<double> priors = {0.5, 0.5};
     std::vector<size_t> envDurations = {1, 1};
 
@@ -433,7 +456,7 @@ TEST_F(HTPSTest, TestVirtualLoss) {
 
     htps_instance->theorems_to_expand();
     // Create children for the root theorem.
-    std::vector<std::shared_ptr<htps::theorem>> children;
+    std::vector<htps::TheoremPointer> children;
     for (int i = 0; i < 2; i++) {
         auto child = std::make_shared<DummyTheorem>("B");
         children.push_back(child);
@@ -453,7 +476,7 @@ TEST_F(HTPSTest, TestVirtualLoss) {
     effects.push_back(effect);
 
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{children[0]}, {children[1]}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{children[0]}, {children[1]}};
     std::vector<double> priors = {0.5, 0.5};
     std::vector<size_t> envDurations = {1, 1};
 
@@ -497,7 +520,7 @@ TEST_F(HTPSTest, TestCountThreshold) {
 
     htps_instance->theorems_to_expand();
     // Create children for the root theorem.
-    std::vector<std::shared_ptr<htps::theorem>> children;
+    std::vector<htps::TheoremPointer> children;
     for (int i = 0; i < 2; i++) {
         auto child = std::make_shared<DummyTheorem>("B");
         children.push_back(child);
@@ -517,7 +540,7 @@ TEST_F(HTPSTest, TestCountThreshold) {
     effects.push_back(effect);
 
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{children[0]}, {children[1]}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{children[0]}, {children[1]}};
     std::vector<double> priors = {0.5, 0.5};
     std::vector<size_t> envDurations = {1, 1};
 
@@ -551,30 +574,6 @@ TEST_F(HTPSTest, TestCountThreshold) {
 }
 
 
-nlohmann::json load_json_from_file(const std::string &filename) {
-    std::ifstream file(filename);
-    if (!file) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-    nlohmann::json j = nlohmann::json::parse(file);
-    return j;
-}
-
-void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
-    std::ofstream file(filename);
-    if (!file) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-
-    // Dump JSON object to the file with an indent of 4 spaces.
-    file << j.dump(4);
-
-    if (!file.good()) {
-        throw std::runtime_error("Error writing to file: " + filename);
-    }
-}
-
-
 TEST_F(HTPSTest, TestInfiniteLoop) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
@@ -582,7 +581,7 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
 
     htps_instance->theorems_to_expand();
 
-    auto child = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B"));
+    TheoremPointer child = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B"));
     // Create a dummy expansion effect for the root theorem.
     std::vector<std::shared_ptr<htps::env_effect>> effects;
     auto effect = std::make_shared<htps::env_effect>();
@@ -597,7 +596,7 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     effects.push_back(effect);
 
     std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
-    std::vector<std::vector<std::shared_ptr<htps::theorem>>> childrenForTactic = {{root}, {child}};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{root}, {child}};
     std::vector<double> priors = {0.5, 0.5};
     std::vector<size_t> envDurations = {1, 1};
 
@@ -629,9 +628,7 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     auto res = htps_instance->get_result();
     auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = res.get_samples();
     // Proof should be empty
-    EXPECT_TRUE(!res.get_proof().proof_theorem);
-    EXPECT_TRUE(!res.get_proof().proof_tactic);
-    EXPECT_TRUE(res.get_proof().children.empty());
+    EXPECT_TRUE(!res.get_proof().has_value());
     // Still, we might have samples
     EXPECT_TRUE(samples_tactic.empty());
     bool is_bad = std::all_of(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
@@ -639,18 +636,406 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     EXPECT_TRUE(samples_effect.size() == 3);
     // No proof samples though, as there is no proof
     EXPECT_TRUE(proof_samples_tactics.empty());
+}
 
-    auto json = nlohmann::json(*htps_instance);
-    dump_json_to_file(json, "samples/test2.json");
+/* Within a single proof tree, two sibling branches might face the same theorem at some point.
+ * This case broke on the initial setup, and a regression test was added to prevent this.
+ * Here, tactic 0 is selected from the root node, leading to two children B1 and B2. These two sibling branches
+ * both result in B3. The HTPS has to be able to handle this case.
+ */
+TEST_F(HTPSTest, TestSiblingEquality) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
 
-    auto json2 = nlohmann::json(expansion);
-    dump_json_to_file(json2, "samples/test3.json");
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1, child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1, child2}};
+    std::vector<double> priors = {1.0};
+    std::vector<size_t> envDurations = {1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems[1] == child2);
+
+    TheoremPointer child3 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B3"));
+
+    effects.clear();
+    effect->goal = child1;
+    effect->tac = dummyTac2;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child2;
+    effect->tac = dummyTac3;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
 }
 
 
+/* It suffices if a single goal of each tactic is killed for a node to become unsolvable.
+ * This test asserts that indeed, if only one goal of a tactic is killed, we set the tactic as killed
+ */
+TEST_F(HTPSTest, TestLoopMultipleChildren) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1, child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1, child2}};
+    std::vector<double> priors = {1.0};
+    std::vector<size_t> envDurations = {1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems[1] == child2);
+
+    TheoremPointer child3 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B3"));
+    TheoremPointer child4 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B4"));
+
+    effects.clear();
+    effect->goal = child1;
+    effect->tac = dummyTac2;
+    effect->children = {child3};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child3}};
+    priors = {1.0};
+    envDurations = {1};
+
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child2;
+    effect->tac = dummyTac3;
+    effect->children = {child4};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child4}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child5 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B5"));
+
+    expansions.clear();
+    effects.clear();
+    effect->goal = child3;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child1}};
+    priors = {1.0};
+    envDurations = {1};
+    // Killed B3 by circle to B1, which will also kill B1
+    expansion = {child3, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child4;
+    effect->tac = dummyTac3;
+    effect->children = {child5};
+    effects.push_back(effect);
+    tactics = {dummyTac3};
+    childrenForTactic = {{child5}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child4, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+
+    htps_instance->expand_and_backup(expansions);
+    htps_instance->theorems_to_expand();
+
+    // Assertions
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult result = htps_instance->get_result();
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    // Proof should be empty
+    EXPECT_TRUE(!result.get_proof().has_value());
+    // Still, we have samples
+    EXPECT_TRUE(samples_tactic.empty());
+    size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
+    EXPECT_TRUE(bad_counts == 3 && samples_critic.size() == 5);
+    EXPECT_TRUE(samples_effect.size() == 5);
+    // No proof samples though, as there is no proof
+    EXPECT_TRUE(proof_samples_tactics.empty());
+}
+
+/* If all tactics of a node are killed, all the tactics leading to this node are also killed.
+ * But if another way to get to that node is found after the node has been killed, the new way has to be killed too.
+ * The case is tested by creating nodes B1, B2 from root, and B1 being killed and afterwards B2 reaching B1.
+ * This regression test ensures this works.
+ */
+TEST_F(HTPSTest, TestAddToKilled) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {child2};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1}, {child2}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems.size() == 1);
+
+    // Now kill B1 by circling to root
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child1;
+    effect->tac = dummyTac;
+    effect->children = {root};
+    effects.push_back(effect);
+    tactics = {dummyTac};
+    childrenForTactic = {{root}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    // Now B1 is dead, but B2 remains
+    theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child2 && theorems.size() == 1);
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_FALSE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->dead_root());
+
+    // Now B2 reaches B1
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = child2;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+    tactics = {dummyTac2};
+    childrenForTactic = {{child1}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child2, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions.push_back(std::make_shared<htps::env_expansion>(expansion));
+    htps_instance->expand_and_backup(expansions);
+
+    htps_instance->theorems_to_expand();
+
+    // Now all should be dead
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult result = htps_instance->get_result();
+    auto [samples_critic, samples_tactic, samples_effect, metric, proof_samples_tactics] = result.get_samples();
+    // Proof should be empty
+    EXPECT_TRUE(!result.get_proof().has_value());
+    // Still, we have samples
+    EXPECT_TRUE(samples_tactic.empty());
+    size_t bad_counts = std::count_if(samples_critic.begin(), samples_critic.end(), [](const auto &sample) {return sample.is_bad();});
+    EXPECT_TRUE(bad_counts == 3 && samples_critic.size() == 3);
+    EXPECT_TRUE(samples_effect.size() == 4);
+    // No proof samples though, as there is no proof
+    EXPECT_TRUE(proof_samples_tactics.empty());
+}
+
+/* Two tactics leading to the same children from the same starting node.
+ */
+TEST_F(HTPSTest, TestMultipleSame) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {child1};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1}, {child1}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {1, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems.size() == 1);
+
+    // Now store to json and load from json
+    nlohmann::json j = htps_instance->operator nlohmann::json();
+    dump_json_to_file(j, "test.json");
+    auto j2 = load_json_from_file("test.json");
+    HTPS search2 = htps::HTPS::from_json(j2);
+    search2.get_result();
+}
+
+TEST_F(HTPSTest, TestErrorExpansion) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+    EXPECT_FALSE(htps_instance->is_proven());
+
+    htps_instance->theorems_to_expand();
+
+    std::vector<size_t> envDurations = {1, 1};
+    std::string error = "This is broken!";
+    htps::env_expansion expansion(root, 1, 1, envDurations, error);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+}
+
+/* If we are given varying times, some values will come before the others.
+ * Specifically, we expect smaller times to come first. This test tries this and asserts
+ * that this is indeed the case
+ */
+TEST_F(HTPSTest, TestBuildMinProofProven) {
+    auto params = dummyParams;
+    params.metric = Metric::TIME;
+    htps_instance->set_params(params);
+
+    htps_instance->theorems_to_expand();
+
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    // Make tactic 1 take longer than tactic 2
+    dummyTac->duration = 100;
+    effect->tac = dummyTac;
+    effect->children = {};
+    effects.push_back(effect);
+    effect = std::make_shared<htps::env_effect>();
+
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac, dummyTac2};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{}, {}};
+    std::vector<double> priors = {0.5, 0.5};
+    std::vector<size_t> envDurations = {2, 1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_TRUE(htps_instance->dead_root());
+
+    HTPSResult res = htps_instance->get_result();
+    proof p = res.get_proof().value();
+    // Tac 2 should be part of the min proof, because it has smaller duration
+    EXPECT_TRUE(p.proof_tactic == dummyTac2);
+}
+
 
 TEST_F(HTPSTest, TestJsonLoading) {
-    auto j = load_json_from_file("samples/test.json");
+    auto j = load_json_from_file("../samples/test.json");
 
     HTPS search = htps::HTPS::from_json(j);
     EXPECT_FALSE(search.is_done());
@@ -664,18 +1049,21 @@ TEST_F(HTPSTest, TestJsonExpectations) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
 
-    auto j = load_json_from_file("samples/search.json");
+    auto j = load_json_from_file("../samples/search_6.json");
 
     HTPS search = htps::HTPS::from_json(j);
     EXPECT_FALSE(search.is_done());
 
-    for (size_t index = 0; index < 3; index++) {
-        j = load_json_from_file("samples/expansions_" + std::to_string(index) + ".json");
+    for (size_t index = 6; index < 7; index++) {
+        j = load_json_from_file("../samples/expansions_" + std::to_string(index) + ".json");
         std::vector<std::shared_ptr<htps::env_expansion>> expansions;
         for (auto &expansion: j) {
             expansions.push_back(std::make_shared<htps::env_expansion>(htps::env_expansion::from_json(expansion)));
         }
-        auto theorems = search.theorems_to_expand();
+//        auto theorems = search.theorems_to_expand();
         search.expand_and_backup(expansions);
+        auto theorems = search.theorems_to_expand();
     }
+//    auto theorems = search.theorems_to_expand();
+//    auto result = search.get_result();
 }

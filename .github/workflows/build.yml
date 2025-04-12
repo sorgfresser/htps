@@ -37,3 +37,27 @@ jobs:
         with:
           path: wheelhouse/*
           name: wheels
+
+  cpp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Install dependencies
+        run: |
+          sudo apt install -y cmake libgtest-dev
+
+      - name: Configure project
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+
+      - name: Build and run CMake test target
+        run: |
+          cd build
+          cmake --build . --target test
+          ./test

@@ -891,6 +891,13 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
         } else {
             // Normal softmax with temperature, i.e. exp(p / temperature)
+            // But take logarithm of policy first, as done in evariste
+            for (size_t i = 0; i < node_policy.size(); i++) {
+                if (node_policy[i] > MIN_FLOAT)
+                    node_policy[i] = std::log(node_policy[i]);
+                else
+                    node_policy[i] = MIN_FLOAT;
+            }
             double p_sum = 0;
             for (auto &p: node_policy) {
                 p = std::exp(p / params.policy_temperature);

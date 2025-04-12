@@ -414,6 +414,7 @@ def test_htps_expansion():
     search.expand_and_backup([expansion])
 
     theorems = search.theorems_to_expand()
+    assert len(theorems) == 1
     _compare_theorem(theorems[0], theorem2)
     assert theorems[0].metadata == {"key": "value2"}
 

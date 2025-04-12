@@ -431,8 +431,6 @@ namespace htps {
             reset_HTPS_stats();
         }
 
-        HTPSNode() = default;
-
         /* Reset the HTPS statistics, resetting counts and logW values.
          * */
         void reset_HTPS_stats();

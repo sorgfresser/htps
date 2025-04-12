@@ -772,13 +772,11 @@ bool HTPSNode::has_virtual_count() const {
 }
 
 HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
-    HTPSNode node;
-    node.thm =j["theorem"];
+    TheoremPointer thm = j["theorem"];
     std::vector<std::shared_ptr<tactic>> tactics;
     for (const auto &tac: j["tactics"]) {
         tactics.push_back(tac);
     }
-    node.tactics = tactics;
     std::vector<std::vector<TheoremPointer>> children_for_tactic;
     for (const auto &children: j["children_for_tactic"]) {
         std::vector<TheoremPointer> children_for_tactic_inner;
@@ -787,28 +785,30 @@ HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
         }
         children_for_tactic.push_back(children_for_tactic_inner);
     }
-    node.children_for_tactic = children_for_tactic;
-    node.killed_tactics = j["killed_tactics"].get<std::unordered_set<size_t>>();
-    node.solving_tactics = j["solving_tactics"].get<std::unordered_set<size_t>>();
-    node.tactic_expandable = j["tactic_expandable"].get<std::vector<bool>>();
-    node.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
-    node.minimum_tactics = MinimumTacticMap::from_json(j["minimum_tactics"]);
-    node.minimum_tactic_length = MinimumTacticLengthMap::from_json(j["minimum_tactic_length"]);
-    node.in_minimum_proof = MinimumBoolMap::from_json(j["in_minimum_proof"]);
-    node.solved = j["solved"];
-    node.is_solved_leaf = j["is_solved_leaf"];
-    node.in_proof = j["in_proof"];
-    node.old_critic_value = j["old_critic_value"];
+    children_for_tactic = children_for_tactic;
+    std::unordered_set<size_t> killed_tactics = j["killed_tactics"].get<std::unordered_set<size_t>>();
+    std::unordered_set<size_t> solving_tactics = j["solving_tactics"].get<std::unordered_set<size_t>>();
+    std::vector<bool> tactic_expandable = j["tactic_expandable"].get<std::vector<bool>>();
+    auto minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
+    auto minimum_tactics = MinimumTacticMap::from_json(j["minimum_tactics"]);
+    auto minimum_tactic_length = MinimumTacticLengthMap::from_json(j["minimum_tactic_length"]);
+    auto in_minimum_proof = MinimumBoolMap::from_json(j["in_minimum_proof"]);
+    bool solved = j["solved"];
+    bool is_solved_leaf = j["is_solved_leaf"];
+    bool in_proof = j["in_proof"];
+    double old_critic_value = j["old_critic_value"];
+    double log_critic_value;
     if (!j["log_critic_value"].is_null()) {
-        node.log_critic_value = j["log_critic_value"];
+        log_critic_value = j["log_critic_value"];
     } else {
-        node.log_critic_value = MIN_FLOAT;
+        log_critic_value = MIN_FLOAT;
     }
-    node.priors = static_cast<std::vector<double>>(j["priors"]);
-    node.q_value_solved = j["q_value_solved"];
-    node.policy = j["policy"];
-    node.exploration = j["exploration"];
-    node.tactic_init_value = j["tactic_init_value"];
+    auto priors = static_cast<std::vector<double>>(j["priors"]);
+    QValueSolved q_value_solved = j["q_value_solved"];
+    std::vector<std::shared_ptr<htps::env_effect>> effects = j["effects"];
+    std::shared_ptr<Policy> policy = j["policy"];
+    double exploration = j["exploration"];
+    double tactic_init_value = j["tactic_init_value"];
     std::vector<double> log_w;
     for (const auto &w: j["log_w"]) {
         if (w.is_null()) {
@@ -817,10 +817,25 @@ HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
             log_w.push_back(w);
         }
     }
-    node.log_w = log_w;
-    node.counts = static_cast<std::vector<size_t>>(j["counts"]);
-    node.virtual_counts = static_cast<std::vector<size_t>>(j["virtual_counts"]);
-    node.reset_mask = static_cast<std::vector<bool>>(j["reset_mask"]);
+
+    std::vector<size_t> counts = static_cast<std::vector<size_t>>(j["counts"]);
+    std::vector<size_t> virtual_counts = static_cast<std::vector<size_t>>(j["virtual_counts"]);
+    std::vector<bool> reset_mask = static_cast<std::vector<bool>>(j["reset_mask"]);
+    bool error = j["error"];
+
+    HTPSNode node = {thm, tactics, children_for_tactic, policy, priors, exploration, log_critic_value, q_value_solved, tactic_init_value, effects, error};
+    node.killed_tactics = killed_tactics;
+    node.solving_tactics = solving_tactics;
+    node.tactic_expandable = tactic_expandable;
+    node.minimum_proof_size = minimum_proof_size;
+    node.minimum_tactics = minimum_tactics;
+    node.minimum_tactic_length = minimum_tactic_length;
+    node.in_minimum_proof = in_minimum_proof;
+    node.solved = solved;
+    node.is_solved_leaf = is_solved_leaf;
+    node.in_proof = in_proof;
+    node.old_critic_value = old_critic_value;
+    node.log_critic_value = log_critic_value;
     return node;
 }
 
@@ -850,6 +865,8 @@ HTPSNode::operator nlohmann::json() const {
     j["counts"] = counts;
     j["virtual_counts"] = virtual_counts;
     j["reset_mask"] = reset_mask;
+    j["error"] = error;
+    j["effects"] = effects;
     return j;
 }
 

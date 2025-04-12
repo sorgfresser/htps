@@ -1035,7 +1035,7 @@ TEST_F(HTPSTest, TestBuildMinProofProven) {
 
 
 TEST_F(HTPSTest, TestJsonLoading) {
-    auto j = load_json_from_file("samples/test.json");
+    auto j = load_json_from_file("../samples/test.json");
 
     HTPS search = htps::HTPS::from_json(j);
     EXPECT_FALSE(search.is_done());
@@ -1049,13 +1049,13 @@ TEST_F(HTPSTest, TestJsonExpectations) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
 
-    auto j = load_json_from_file("samples/search_6.json");
+    auto j = load_json_from_file("../samples/search_6.json");
 
     HTPS search = htps::HTPS::from_json(j);
     EXPECT_FALSE(search.is_done());
 
     for (size_t index = 6; index < 7; index++) {
-        j = load_json_from_file("samples/expansions_" + std::to_string(index) + ".json");
+        j = load_json_from_file("../samples/expansions_" + std::to_string(index) + ".json");
         std::vector<std::shared_ptr<htps::env_expansion>> expansions;
         for (auto &expansion: j) {
             expansions.push_back(std::make_shared<htps::env_expansion>(htps::env_expansion::from_json(expansion)));

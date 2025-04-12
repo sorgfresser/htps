@@ -809,7 +809,15 @@ HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
     node.policy = j["policy"];
     node.exploration = j["exploration"];
     node.tactic_init_value = j["tactic_init_value"];
-    node.log_w = static_cast<std::vector<double>>(j["log_w"]);
+    std::vector<double> log_w;
+    for (const auto &w: j["log_w"]) {
+        if (w.is_null()) {
+            log_w.push_back(MIN_FLOAT);
+        } else {
+            log_w.push_back(w);
+        }
+    }
+    node.log_w = log_w;
     node.counts = static_cast<std::vector<size_t>>(j["counts"]);
     node.virtual_counts = static_cast<std::vector<size_t>>(j["virtual_counts"]);
     node.reset_mask = static_cast<std::vector<bool>>(j["reset_mask"]);

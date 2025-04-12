@@ -45,7 +45,14 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
             alpha_zero(q_values, pi_values, counts, result);
             break;
         case RPO:
-            mcts_rpo(q_values, pi_values, counts, result);
+            try {
+                mcts_rpo(q_values, pi_values, counts, result);
+            }
+            catch (std::runtime_error &e) {
+                result.clear();
+                alpha_zero(q_values, pi_values, counts, result);
+            }
+
             break;
         default:
             throw std::invalid_argument("Invalid policy type");

@@ -758,7 +758,6 @@ static void Theorem_dealloc(PyObject *self) {
 }
 
 static PyObject *Theorem_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
-    printf("New!");
     auto *self = (PyTheorem *) type->tp_alloc(type, 0);
     if (!self) {
         PyErr_SetString(PyExc_MemoryError, "could not allocate memory");
@@ -1089,11 +1088,8 @@ PyObject *Theorem_NewFromShared(const htps::TheoremPointer &thm_ptr) {
     py_thm->cpp_obj->set_context(thm->ctx);
     py_thm->cpp_obj->hypotheses = thm->hypotheses;
     py_thm->cpp_obj->past_tactics = thm->past_tactics;
-    printf("Copy dict!\n");
     if (thm->metadata.has_value()) {
-        printf("Refcount: %zi\n", Py_REFCNT(std::any_cast<PyObject *>(thm->metadata)));
         PyObject *copiedDict = PyDict_Copy(std::any_cast<PyObject *>(thm->metadata));
-        printf("Copy dict finished!\n");
         if (copiedDict == NULL) {
             PyErr_SetString(PyExc_MemoryError, "Could not copy dict");
             return NULL;

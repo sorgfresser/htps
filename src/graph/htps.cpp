@@ -64,16 +64,11 @@ void Simulation::leaves(std::vector<std::shared_ptr<theorem>> &leaves_vector) co
 }
 
 bool Simulation::operator==(const Simulation &other) const {
-    if (root != other.root)
+    if (*root != *other.root)
         return false;
     if (children_for_theorem.size() != other.children_for_theorem.size())
         return false;
     for (const auto &[thm_str, children]: children_for_theorem) {
-        // Tactics must match
-        if (!other.tactics.contains(thm_str))
-            return false;
-        if (*tactics.at(thm_str) != *other.tactics.at(thm_str))
-            return false;
         // And children must match
         auto other_it = other.children_for_theorem.find(thm_str);
         if (other_it == other.children_for_theorem.end())
@@ -83,15 +78,26 @@ bool Simulation::operator==(const Simulation &other) const {
             return false;
         // No need to sort etc., as the order must match
         for (size_t i = 0; i < children.size(); i++) {
-            if (children[i] != other_children[i])
+            if (*children[i] != *other_children[i])
                 return false;
         }
     }
+    // Tactics must match
+    for (const auto &[thm_str, tactic]: tactics) {
+        if (!other.tactics.contains(thm_str))
+            return false;
+        if (*tactics.at(thm_str) != *other.tactics.at(thm_str))
+            return false;
+    }
     // Now the other way around. Since we now that they match on each theorem of the first simulation,
     // we only need to check that the other simulation has no extra theorems
-    return std::all_of(other.children_for_theorem.begin(), other.children_for_theorem.end(), [this](const auto &pair) {
+    bool has_children = std::all_of(other.children_for_theorem.begin(), other.children_for_theorem.end(), [this](const auto &pair) {
         return children_for_theorem.contains(pair.first);
     });
+    bool has_tactics = std::all_of(other.tactics.begin(), other.tactics.end(), [this](const auto &pair) {
+        return tactics.contains(pair.first);
+    });
+    return has_children && has_tactics;
 }
 
 void Simulation::set_depth(const std::shared_ptr<theorem> &thm, size_t d) {
@@ -877,7 +883,7 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         assert(!HTPS_node->killed(tactic_id));
         auto tactic_ptr = HTPS_node->get_tactic(tactic_id);
 #ifdef VERBOSE_PRINTS
-        printf("Setting tactic %i\n", tactic_id);
+        printf("Setting tactic %zu\n", tactic_id);
 #endif
         sim.set_tactic(current, tactic_ptr);
         sim.set_tactic_id(current, tactic_id);
@@ -1260,10 +1266,21 @@ HTPS HTPS::from_json(const nlohmann::json &j) {
     if (j["simulations_for_theorem"].is_null())
         simulations_for_theorem = TheoremMap<std::vector<std::shared_ptr<Simulation>>>();
     else {
+        // Can only map a single simulation to simulations for theorem once
+        std::vector<bool> sims_used(htps.simulations.size(), false);
         for (const auto &[thm_str, sim]: j["simulations_for_theorem"].items()) {
             std::vector<std::shared_ptr<Simulation>> sims;
             for (const auto &s: sim) {
-                sims.push_back(std::make_shared<Simulation>(Simulation::from_json(s)));
+                // Find the simulation in simulations, use that one
+                std::shared_ptr<Simulation> current_sim = std::make_shared<Simulation>(Simulation::from_json(s));
+                for (size_t i = 0; i < htps.simulations.size(); i++) {
+                    if (!sims_used[i] && *htps.simulations[i] == *current_sim) {
+                        current_sim = htps.simulations[i];
+                        sims_used[i] = true;
+                        break;
+                    }
+                }
+                sims.push_back(current_sim);
             }
             simulations_for_theorem.insert(static_cast<std::string>(thm_str), sims);
         }

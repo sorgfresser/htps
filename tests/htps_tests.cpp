@@ -920,6 +920,65 @@ TEST_F(HTPSTest, TestAddToKilled) {
     EXPECT_TRUE(proof_samples_tactics.empty());
 }
 
+/* If the last child of a node is killed, the corresponding parent should be killed too.
+ */
+TEST_F(HTPSTest, TestKilledRecursively) {
+    htps_instance->theorems_to_expand();
+
+    TheoremPointer child1 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B1"));
+    std::vector<std::shared_ptr<htps::env_effect>> effects;
+    auto effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac;
+    effect->children = {child1};
+    effects.push_back(effect);
+
+    std::vector<std::shared_ptr<htps::tactic>> tactics = {dummyTac};
+    std::vector<std::vector<htps::TheoremPointer>> childrenForTactic = {{child1}};
+    std::vector<double> priors = {1.0};
+    std::vector<size_t> envDurations = {1};
+
+    htps::env_expansion expansion(root, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors);
+    std::vector<std::shared_ptr<htps::env_expansion>> expansions = {std::make_shared<htps::env_expansion>(expansion)};
+
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    auto theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child1 && theorems.size() == 1);
+
+    TheoremPointer child2 = static_pointer_cast<htps::theorem>(std::make_shared<DummyTheorem>("B2"));
+    effects.clear();
+    effect = std::make_shared<htps::env_effect>();
+    effect->goal = root;
+    effect->tac = dummyTac2;
+    effect->children = {child2};
+    effects.push_back(effect);
+
+    tactics = {dummyTac2};
+    childrenForTactic = {{child2}};
+    priors = {1.0};
+    envDurations = {1};
+    expansion = {child1, 1, 1, envDurations, effects, 0.0, tactics, childrenForTactic, priors};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+    htps_instance->expand_and_backup(expansions);
+    expansions.clear();
+
+    theorems = htps_instance->theorems_to_expand();
+    EXPECT_TRUE(theorems[0] == child2 && theorems.size() == 1);
+
+    envDurations = {1, 1, 1};
+    std::string error = "This is broken!";
+    expansion = {child2, 1, 1, envDurations, error};
+    expansions = {std::make_shared<htps::env_expansion>(expansion)};
+    htps_instance->expand_and_backup(expansions);
+
+    htps_instance->theorems_to_expand();
+    EXPECT_TRUE(htps_instance->is_done());
+    EXPECT_FALSE(htps_instance->is_proven());
+    EXPECT_TRUE(htps_instance->dead_root());
+}
+
 /* Two tactics leading to the same children from the same starting node.
  */
 TEST_F(HTPSTest, TestMultipleSame) {

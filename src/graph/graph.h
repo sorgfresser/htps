@@ -1535,9 +1535,14 @@ namespace htps {
                 std::shared_ptr<T> node_ptr = std::make_shared<T>(node);
                 nodes.set(th, node_ptr);
                 if (node.is_bad()) {
-                    for (const auto &[parent_th, tactic_id]: ancestors.get_ancestors(th)) {
+                    const AncestorSet anc = ancestors.get_ancestors(th);
+                    for (const auto &[parent_th, tactic_id]: anc) {
                         if (!parent_th.empty()) {
-                            nodes.at(parent_th)->kill_tactic(tactic_id);
+                            if (!nodes.contains(parent_th)) {
+                                std::string msg = "Parent node not found: " + parent_th;
+                                throw std::runtime_error(msg);
+                            }
+                            kill_tactic(nodes.at(parent_th), tactic_id);
                         }
                     }
                     continue;

@@ -531,9 +531,10 @@ static PyObject *PyTactic_get_unique_string(PyObject *self, void *closure) {
     return PyObject_from_string(tac->cpp_obj.unique_string);
 }
 
-static PyObject *PyTactic_get_is_valid(PyObject *self, void *closure) {
-    auto tac = (PyTactic *) self;
-    return tac->cpp_obj.is_valid ? Py_True: Py_False;
+static PyObject *PyTactic_get_is_valid(PyTactic *self, void *closure) {
+    PyObject *res = self->cpp_obj.is_valid ? Py_True: Py_False;
+    Py_INCREF(res);
+    return res;
 }
 
 static PyObject *PyTactic_get_duration(PyObject *self, void *closure) {

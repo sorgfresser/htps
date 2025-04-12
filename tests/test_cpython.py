@@ -475,6 +475,18 @@ def _create_expansion2(theorem):
     times = [0, 0]
     children_for_tactic = [[child_thm], [child_thm2]]
     expansion = EnvExpansion(theorem, 1, 1, times, effects, -0.5, tactics=tactics, children_for_tactic=children_for_tactic, priors=priors)
+    json_str = expansion.get_json_str()
+    test_expansion = EnvExpansion.from_json_str(json_str)
+    _compare_theorem(test_expansion.thm, expansion.thm)
+    assert test_expansion.expander_duration == expansion.expander_duration
+    assert test_expansion.generation_duration == expansion.generation_duration
+    assert test_expansion.env_durations == expansion.env_durations
+    assert test_expansion.log_critic == expansion.log_critic
+    _compare_tactics(test_expansion.tactics, expansion.tactics)
+    assert test_expansion.priors == expansion.priors
+    [[_compare_theorem(test_child, child) for test_child, child in zip(test_children, children)] for test_children, children in zip(test_expansion.children_for_tactic, expansion.children_for_tactic)]
+    assert all(effect.goal.unique_string == test_effect.goal.unique_string and effect.tactic.unique_string == test_effect.tactic.unique_string and len(effect.children) == len(test_effect.children) for effect, test_effect in zip(expansion.effects, test_expansion.effects))
+    assert all(all(child.unique_string == test_child.unique_string for child, test_child in zip(effect.children, test_effect.children)) for effect, test_effect in zip(expansion.effects, test_expansion.effects))
     return expansion
 
 
@@ -506,6 +518,8 @@ def test_metadata_garbage_collection():
     assert len(theorems) == 1
     assert theorems[0].metadata == {"proof_state_idx": 2}
     expansion = _create_expansion(theorems[0])
+    with open("test.json", "w") as file:
+        file.write(search.get_json_str())
 
 def test_runtime_error():
     context = Context([])

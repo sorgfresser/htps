@@ -24,10 +24,12 @@ namespace htps {
 
     constexpr double SOLVED_LOG_VALUE = 0.0; // e(0) = 1
 
+    size_t get_seed();
     std::mt19937 setup_gen();
 
     extern std::mt19937 gen;
     extern std::uniform_real_distribution<double> dis;
+    extern size_t seed;
 
     class HTPSSampleEffect {
     private:
@@ -202,6 +204,10 @@ namespace htps {
         // If the root is not proven, we do not explore already solved nodes
         bool early_stopping_solved_if_root_not_proven;
         size_t virtual_loss; // The number of virtual count added for each visit
+
+        operator nlohmann::json() const;
+
+        static htps_params from_json(const nlohmann::json &j);
     };
 
     // A single simulation of the HTPS algorithm
@@ -308,6 +314,12 @@ namespace htps {
         void increment_expansions();
 
         size_t num_tactics();
+
+        explicit operator nlohmann::json() const;
+
+        static Simulation from_json(const nlohmann::json &j);
+
+        void deduplicate(const std::shared_ptr<theorem> &ptr);
     };
 }
 
@@ -438,6 +450,10 @@ namespace htps {
         bool has_virtual_count(size_t tactic_id) const;
 
         bool has_virtual_count() const;
+
+        static HTPSNode from_json(const nlohmann::json &j);
+
+        explicit operator nlohmann::json() const;
     };
 }
 
@@ -483,6 +499,8 @@ namespace htps {
         std::vector<HTPSSampleTactics> get_tactic_samples() const;
 
         std::vector<HTPSSampleEffect> get_effect_samples() const;
+
+
     };
 
 /**
@@ -585,6 +603,12 @@ namespace htps {
         void theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems);
 
         HTPSResult get_result();
+
+        static HTPS from_json(const nlohmann::json &j);
+
+        explicit operator nlohmann::json() const;
+
+        htps::htps_params get_params() const;
     };
 
 }

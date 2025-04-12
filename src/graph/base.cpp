@@ -2,9 +2,24 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include "../json.hpp"
 
 using namespace htps;
+
+tactic tactic::from_json(const nlohmann::json &j) {
+    tactic t;
+    t.unique_string = j["unique_string"];
+    t.is_valid = j["is_valid"];
+    t.duration = j["duration"];
+    return t;
+}
+
+tactic::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["unique_string"] = unique_string;
+    j["is_valid"] = is_valid;
+    j["duration"] = duration;
+    return j;
+}
 
 bool tactic::operator==(const tactic &t) const {
     return unique_string == t.unique_string;
@@ -20,12 +35,18 @@ std::size_t std::hash<tactic>::operator()(const tactic &t) const {
 }
 
 
-hypothesis hypothesis::from_json(const std::string &json) {
-    nlohmann::json j = nlohmann::json::parse(json);
+hypothesis hypothesis::from_json(const nlohmann::json &j) {
     hypothesis h;
     h.identifier = j["identifier"];
     h.type = j["type"];
     return h;
+}
+
+hypothesis::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["identifier"] = identifier;
+    j["type"] = type;
+    return j;
 }
 
 std::string theorem::get_unique_string(const std::string &conclusion, const std::vector<hypothesis> &hypotheses) {
@@ -65,6 +86,52 @@ void theorem::set_tactics(std::vector<tactic> &tactics) {
     past_tactics = tactics;
 }
 
+theorem theorem::from_json(const nlohmann::json &j) {
+    theorem t;
+    t.conclusion = j["conclusion"];
+    std::vector<hypothesis> hypotheses;
+    for (const auto &h: j["hypotheses"]) {
+        hypotheses.push_back(hypothesis::from_json(h));
+    }
+    t.unique_string = j["unique_string"];
+    t.set_context(context::from_json(j["ctx"]));
+    std::vector<tactic> past_tactics;
+    for (const auto &tac: j["past_tactics"]) {
+        past_tactics.push_back(tactic::from_json(tac));
+    }
+    t.set_tactics(past_tactics);
+    return t;
+}
+
+theorem::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["conclusion"] = conclusion;
+    j["hypotheses"] = hypotheses;
+    j["unique_string"] = unique_string;
+    j["ctx"] = ctx;
+    j["past_tactics"] = past_tactics;
+    return j;
+}
+
+proof proof::from_json(const nlohmann::json &j) {
+    proof p;
+    p.proof_theorem = std::make_shared<theorem>(theorem::from_json(j["proof_theorem"]));
+    p.proof_tactic = std::make_shared<tactic>(tactic::from_json(j["proof_tactic"]));
+    std::vector<proof> children;
+    for (const auto &child: j["children"]) {
+        children.push_back(proof::from_json(child));
+    }
+    p.children = children;
+    return p;
+}
+
+proof::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["proof_theorem"] = proof_theorem;
+    j["proof_tactic"] = proof_tactic;
+    j["children"] = children;
+    return j;
+}
 
 std::size_t std::hash<theorem>::operator()(const theorem &t) const {
     return std::hash<std::string>{}(t.unique_string);
@@ -78,3 +145,14 @@ std::size_t std::hash<std::pair<std::shared_ptr<htps::theorem>, size_t> >::opera
     return first_hash ^ (second_hash);
 }
 
+context context::from_json(const nlohmann::json &j) {
+    context ctx;
+    ctx.namespaces = j["namespaces"];
+    return ctx;
+}
+
+context::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["namespaces"] = namespaces;
+    return j;
+}

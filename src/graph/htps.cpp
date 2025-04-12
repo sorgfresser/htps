@@ -3,23 +3,34 @@
 //
 
 #include "htps.h"
+#include "graph.h"
 #include <memory>
 #include <vector>
 #include <numeric>
 #include <iostream>
 #include <optional>
 
+
 using namespace htps;
+
+size_t htps::get_seed() {
+    std::random_device rd;
+    size_t s = std::getenv("SEED") ? std::stoi(std::getenv("SEED")) : rd();
+#ifdef VERBOSE_PRINTS
+    printf("Seed: %i", s);
+#endif
+    return s;
+}
 
 std::mt19937 htps::setup_gen() {
     std::random_device rd;
-    size_t seed = std::getenv("SEED") ? std::stoi(std::getenv("SEED")) : rd();
 #ifdef VERBOSE_PRINTS
-    printf("Seed: %i", seed);
+    printf("Seed: %i", htps::seed);
 #endif
-    return std::mt19937(seed);
+    return std::mt19937(htps::seed);
 }
 
+size_t htps::seed = get_seed();
 std::mt19937 htps::gen = setup_gen();
 std::uniform_real_distribution<double> htps::dis = std::uniform_real_distribution<double>(0, 1);
 
@@ -53,16 +64,11 @@ void Simulation::leaves(std::vector<std::shared_ptr<theorem>> &leaves_vector) co
 }
 
 bool Simulation::operator==(const Simulation &other) const {
-    if (root != other.root)
+    if (*root != *other.root)
         return false;
     if (children_for_theorem.size() != other.children_for_theorem.size())
         return false;
     for (const auto &[thm_str, children]: children_for_theorem) {
-        // Tactics must match
-        if (!other.tactics.contains(thm_str))
-            return false;
-        if (*tactics.at(thm_str) != *other.tactics.at(thm_str))
-            return false;
         // And children must match
         auto other_it = other.children_for_theorem.find(thm_str);
         if (other_it == other.children_for_theorem.end())
@@ -72,15 +78,26 @@ bool Simulation::operator==(const Simulation &other) const {
             return false;
         // No need to sort etc., as the order must match
         for (size_t i = 0; i < children.size(); i++) {
-            if (children[i] != other_children[i])
+            if (*children[i] != *other_children[i])
                 return false;
         }
     }
+    // Tactics must match
+    for (const auto &[thm_str, tactic]: tactics) {
+        if (!other.tactics.contains(thm_str))
+            return false;
+        if (*tactics.at(thm_str) != *other.tactics.at(thm_str))
+            return false;
+    }
     // Now the other way around. Since we now that they match on each theorem of the first simulation,
     // we only need to check that the other simulation has no extra theorems
-    return std::all_of(other.children_for_theorem.begin(), other.children_for_theorem.end(), [this](const auto &pair) {
+    bool has_children = std::all_of(other.children_for_theorem.begin(), other.children_for_theorem.end(), [this](const auto &pair) {
         return children_for_theorem.contains(pair.first);
     });
+    bool has_tactics = std::all_of(other.tactics.begin(), other.tactics.end(), [this](const auto &pair) {
+        return tactics.contains(pair.first);
+    });
+    return has_children && has_tactics;
 }
 
 void Simulation::set_depth(const std::shared_ptr<theorem> &thm, size_t d) {
@@ -235,6 +252,112 @@ void Simulation::increment_expansions() {
 size_t Simulation::num_tactics() {
     return tactics.size();
 }
+
+Simulation::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["root"] = *root;
+    j["theorems"] = theorems.operator nlohmann::json();
+    j["tactic_ids"] = tactic_ids.operator nlohmann::json();
+    j["tactics"] = tactics.operator nlohmann::json();
+    j["depth"] = depth.operator nlohmann::json();
+    j["children_for_theorem"] = children_for_theorem.operator nlohmann::json();
+    j["parent_for_theorem"] = parent_for_theorem.operator nlohmann::json();
+    j["values"] = values.operator nlohmann::json();
+    j["solved"] = solved.operator nlohmann::json();
+    j["virtual_count_added"] = virtual_count_added.operator nlohmann::json();
+    j["seen"] = seen.operator nlohmann::json();
+    j["expansions"] = expansions;
+    return j;
+}
+
+Simulation Simulation::from_json(const nlohmann::json &j) {
+    Simulation s;
+    s.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
+    TheoremMap<std::shared_ptr<theorem>> thms;
+    for (const auto &[thm_str, thm]: j["theorems"].items()) {
+        thms.insert_or_assign(thm_str, std::make_shared<theorem>(theorem::from_json(thm)));
+    }
+    s.theorems = thms;
+    s.tactic_ids = TheoremMap<size_t>::from_json(j["tactic_ids"]);
+    TheoremMap<std::shared_ptr<tactic>> tacs;
+    for (const auto &[thm_str, tac]: j["tactics"].items()) {
+        tacs.insert_or_assign(thm_str, std::make_shared<tactic>(tactic::from_json(tac)));
+    }
+    s.tactics = tacs;
+    s.depth = TheoremMap<size_t>::from_json(j["depth"]);
+    TheoremMap<std::vector<std::shared_ptr<theorem>>> children;
+    for (const auto &[thm_str, children_vec]: j["children_for_theorem"].items()) {
+        std::vector<std::shared_ptr<theorem>> children_vec_;
+        for (const auto &child_str: children_vec) {
+            children_vec_.push_back(std::make_shared<theorem>(theorem::from_json(child_str)));
+        }
+        children.insert_or_assign(thm_str, children_vec_);
+    }
+    s.children_for_theorem = children;
+    TheoremMap<std::shared_ptr<theorem>> parents;
+    for (const auto &[thm_str, parent_str]: j["parent_for_theorem"].items()) {
+        if (parent_str.is_null()) {
+            parents.insert_or_assign(thm_str, nullptr);
+            continue;
+        }
+        parents.insert_or_assign(thm_str, std::make_shared<theorem>(theorem::from_json(parent_str)));
+    }
+    s.parent_for_theorem = parents;
+    if (j["values"].is_null()) {
+        s.values = TheoremMap<double>();
+    }
+    else {
+        s.values = TheoremMap<double>::from_json(j["values"]);
+    }
+    if (j["solved"].is_null()) {
+        s.solved = TheoremMap<bool>();
+    }
+    else {
+        s.solved = TheoremMap<bool>::from_json(j["solved"]);
+    }
+    s.virtual_count_added = TheoremMap<bool>::from_json(j["virtual_count_added"]);
+    s.expansions = j["expansions"];
+    if (j["seen"].is_null()) {
+        s.seen = TheoremMap<TheoremSet>();
+    }
+    else {
+        TheoremMap<TheoremSet> seen{};
+        for (const auto &[thm_str, thm_set]: j["seen"].items()) {
+            seen.insert_or_assign(thm_str, TheoremSet::from_json(thm_set));
+        }
+        s.seen = seen;
+    }
+    return s;
+}
+
+void Simulation::deduplicate(const std::shared_ptr<theorem> &ptr) {
+    auto it = theorems.find(ptr);
+    if (it != theorems.end()) {
+        theorems.insert_or_assign(ptr, ptr);
+    }
+    for (auto &[thm_str, children]: children_for_theorem) {
+        for (size_t i = 0; i < children.size(); i++) {
+            auto &child = children[i];
+            if (*child == *ptr) {
+                children[i] = ptr;
+            }
+        }
+    }
+    for (auto &[thm_str, parent]: parent_for_theorem) {
+        if (parent && *parent == *ptr) {
+            parent_for_theorem.insert_or_assign(thm_str, ptr);
+        }
+    }
+    for (auto &[thm_str, seen_set]: seen) {
+        if (seen_set.contains(ptr)) {
+            seen_set.insert(ptr);
+        }
+    }
+    if (*root == *ptr) {
+        root = ptr;
+    }
+}
+
 
 void HTPSNode::reset_HTPS_stats() {
     // implies we will simply set logW to the first value we receive
@@ -568,6 +691,76 @@ bool HTPSNode::has_virtual_count() const {
     return std::any_of(virtual_counts.begin(), virtual_counts.end(), [](size_t count) { return count > 0; });
 }
 
+HTPSNode HTPSNode::from_json(const nlohmann::json &j) {
+    HTPSNode node;
+    node.thm = std::make_shared<theorem>(theorem::from_json(j["theorem"]));
+    std::vector<std::shared_ptr<tactic>> tactics;
+    for (const auto &tac: j["tactics"]) {
+        tactics.push_back(std::make_shared<tactic>(tactic::from_json(tac)));
+    }
+    node.tactics = tactics;
+    std::vector<std::vector<std::shared_ptr<theorem>>> children_for_tactic;
+    for (const auto &children: j["children_for_tactic"]) {
+        std::vector<std::shared_ptr<theorem>> children_for_tactic_inner;
+        for (const auto &child: children) {
+            children_for_tactic_inner.push_back(std::make_shared<theorem>(theorem::from_json(child)));
+        }
+        children_for_tactic.push_back(children_for_tactic_inner);
+    }
+    node.children_for_tactic = children_for_tactic;
+    node.killed_tactics = j["killed_tactics"].get<std::unordered_set<size_t>>();
+    node.solving_tactics = j["solving_tactics"].get<std::unordered_set<size_t>>();
+    node.tactic_expandable = j["tactic_expandable"].get<std::vector<bool>>();
+    node.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
+    node.minimum_tactics = MinimumTacticMap::from_json(j["minimum_tactics"]);
+    node.minimum_tactic_length = MinimumTacticLengthMap::from_json(j["minimum_tactic_length"]);
+    node.in_minimum_proof = MinimumBoolMap::from_json(j["in_minimum_proof"]);
+    node.solved = j["solved"];
+    node.is_solved_leaf = j["is_solved_leaf"];
+    node.in_proof = j["in_proof"];
+    node.old_critic_value = j["old_critic_value"];
+    node.log_critic_value = j["log_critic_value"];
+    node.priors = static_cast<std::vector<double>>(j["priors"]);
+    node.q_value_solved = j["q_value_solved"];
+    node.policy = std::make_shared<Policy>(Policy::from_json(j["policy"]));
+    node.exploration = j["exploration"];
+    node.tactic_init_value = j["tactic_init_value"];
+    node.log_w = static_cast<std::vector<double>>(j["log_w"]);
+    node.counts = static_cast<std::vector<size_t>>(j["counts"]);
+    node.virtual_counts = static_cast<std::vector<size_t>>(j["virtual_counts"]);
+    node.reset_mask = static_cast<std::vector<bool>>(j["reset_mask"]);
+    return node;
+}
+
+HTPSNode::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["theorem"] = *thm;
+    j["tactics"] = nlohmann::json(tactics);
+    j["children_for_tactic"] = nlohmann::json(children_for_tactic);
+    j["killed_tactics"] = killed_tactics;
+    j["solving_tactics"] = solving_tactics;
+    j["tactic_expandable"] = tactic_expandable;
+    j["minimum_proof_size"] = nlohmann::json(minimum_proof_size);
+    j["minimum_tactics"] = nlohmann::json(minimum_tactics);
+    j["minimum_tactic_length"] = nlohmann::json(minimum_tactic_length);
+    j["in_minimum_proof"] = nlohmann::json(in_minimum_proof);
+    j["solved"] = solved;
+    j["is_solved_leaf"] = is_solved_leaf;
+    j["in_proof"] = in_proof;
+    j["old_critic_value"] = old_critic_value;
+    j["log_critic_value"] = log_critic_value;
+    j["priors"] = priors;
+    j["q_value_solved"] = q_value_solved;
+    j["policy"] = nlohmann::json(*policy);
+    j["exploration"] = exploration;
+    j["tactic_init_value"] = tactic_init_value;
+    j["log_w"] = log_w;
+    j["counts"] = counts;
+    j["virtual_counts"] = virtual_counts;
+    j["reset_mask"] = reset_mask;
+    return j;
+}
+
 std::size_t std::hash<HTPSNode>::operator()(const HTPSNode &n) const {
     return std::hash<theorem>()(*n.get_theorem());
 }
@@ -693,26 +886,32 @@ Simulation HTPS::find_leaves_to_expand(std::vector<std::shared_ptr<theorem>> &te
         // Select subsequent tactic
         HTPS_node->compute_policy(node_policy, true);
         size_t tactic_id;
+        printf("%lf", params.policy_temperature);
         if (params.policy_temperature == 0) {
             tactic_id = std::distance(node_policy.begin(), std::max_element(node_policy.begin(), node_policy.end()));
         } else {
-            // Normal softmax, but with the logarithmic policy. I.e. exp(log(p)/temperature), which cancels out
-            // So instead, we compute p^(1/temperature) directly
+            // Normal softmax with temperature, i.e. exp(p / temperature)
             double p_sum = 0;
             for (auto &p: node_policy) {
-                p = std::pow(p, 1.0 / params.policy_temperature);
+                p = std::exp(p / params.policy_temperature);
                 p_sum += p;
             }
             for (auto &p: node_policy) {
                 p = p / p_sum;
             }
+#ifdef VERBOSE_PRINTS
+            for (auto &p: node_policy) {
+                printf("%lf ", p);
+            }
+            printf("\n");
+#endif
             std::discrete_distribution<size_t> dist(node_policy.begin(), node_policy.end());
             tactic_id = dist(gen);
         }
         assert(!HTPS_node->killed(tactic_id));
         auto tactic_ptr = HTPS_node->get_tactic(tactic_id);
 #ifdef VERBOSE_PRINTS
-        printf("Setting tactic %i\n", tactic_id);
+        printf("Setting tactic %zu\n", tactic_id);
 #endif
         sim.set_tactic(current, tactic_ptr);
         sim.set_tactic_id(current, tactic_id);
@@ -900,6 +1099,9 @@ void HTPS::backup_leaves(std::shared_ptr<Simulation> &sim, bool only_value) {
             updated_root = true;
             continue;
         }
+        if (!children_propagated.contains(sim->parent(cur))) {
+            children_propagated.insert_or_assign(sim->parent(cur), 0);
+        }
         children_propagated.at(sim->parent(cur)) += 1;
         if (children_propagated.at(sim->parent(cur)) == sim->get_children(sim->parent(cur)).size()) {
             to_process.push(sim->parent(cur));
@@ -936,6 +1138,10 @@ void HTPS::batch_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
 #ifdef VERBOSE_PRINTS
             printf("To expand is empty!");
 #endif
+            assert (!propagate_needed);
+            propagate_needed = true;
+            find_unexplored_and_propagate_expandable();
+            cleanup(sim);
             break;
         }
         _single_to_expand(single_to_expand, sim, to_expand);
@@ -1013,6 +1219,9 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
 }
 
 void HTPS::theorems_to_expand(std::vector<std::shared_ptr<theorem>> &theorems) {
+    if (!currently_expanding.empty()) {
+        throw std::runtime_error("Currently expanding is not empty, give results first!");
+    }
     return batch_to_expand(theorems);
 }
 
@@ -1060,6 +1269,113 @@ void HTPS::set_params(const htps_params &new_params) {
     policy = std::make_shared<Policy>(params.policy_type, params.exploration);
 }
 
+HTPS HTPS::from_json(const nlohmann::json &j) {
+    HTPS htps;
+    htps.root = std::make_shared<theorem>(theorem::from_json(j["root"]));
+    TheoremMap<std::shared_ptr<HTPSNode>> nodes;
+    for (const auto &node: j["nodes"]) {
+        auto n = HTPSNode::from_json(node);
+        nodes.insert(n.get_theorem(), std::make_shared<HTPSNode>(n));
+    }
+    htps.nodes = nodes;
+    htps.ancestors = AncestorsMap::from_json(j["ancestors"]);
+    htps.permanent_ancestors = AncestorsMap::from_json(j["permanent_ancestors"]);
+    htps.unexplored_theorems = TheoremSet::from_json(j["unexplored_theorems"]);
+    htps.minimum_proof_size = MinimumLengthMap::from_json(j["minimum_proof_size"]);
+    htps.initial_minimum_proof_size = MinimumLengthMap::from_json(j["initial_minimum_proof_size"]);
+    htps.policy = std::make_shared<Policy>(Policy::from_json(j["policy"]));
+    htps.params = htps_params::from_json(j["params"]);
+    htps.expansion_count = j["expansion_count"];
+    htps.simulations = std::vector<std::shared_ptr<Simulation>>();
+    for (const auto &sim: j["simulations"]) {
+        htps.simulations.push_back(std::make_shared<Simulation>(Simulation::from_json(sim)));
+    }
+    for (auto &sim: htps.simulations) {
+        sim->deduplicate(htps.root);
+    }
+    TheoremMap<std::vector<std::shared_ptr<Simulation>>> simulations_for_theorem;
+    if (j["simulations_for_theorem"].is_null())
+        simulations_for_theorem = TheoremMap<std::vector<std::shared_ptr<Simulation>>>();
+    else {
+        // Can only map a single simulation to simulations for theorem once
+        std::vector<bool> sims_used(htps.simulations.size(), false);
+        for (const auto &[thm_str, sim]: j["simulations_for_theorem"].items()) {
+            std::vector<std::shared_ptr<Simulation>> sims;
+            for (const auto &s: sim) {
+                // Find the simulation in simulations, use that one
+                std::shared_ptr<Simulation> current_sim = std::make_shared<Simulation>(Simulation::from_json(s));
+                for (size_t i = 0; i < htps.simulations.size(); i++) {
+                    if (!sims_used[i] && *htps.simulations[i] == *current_sim) {
+                        current_sim = htps.simulations[i];
+                        sims_used[i] = true;
+                        break;
+                    }
+                }
+                sims.push_back(current_sim);
+            }
+            simulations_for_theorem.insert(static_cast<std::string>(thm_str), sims);
+        }
+    }
+    htps.simulations_for_theorem = simulations_for_theorem;
+    htps.backedup_hashes = j["backedup_hashes"].get<std::unordered_set<size_t>>();
+    htps.currently_expanding = TheoremSet::from_json(j["currently_expanding"]);
+    htps.propagate_needed = j["propagate_needed"];
+    htps.done = j["done"];
+    htps::seed = j["seed"];
+    htps::gen = setup_gen();
+    return htps;
+}
+
+HTPS::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["root"] = *root;
+    std::vector<nlohmann::json> nodes_explicit;
+    for (const auto &[thm, node]: nodes) {
+        nodes_explicit.push_back(nlohmann::json(*node));
+    }
+    j["nodes"] = nodes_explicit;
+    nlohmann::json ancestors_json;
+    for (const auto &[thm, ancestor]: ancestors) {
+        ancestors_json[thm] = ancestor.operator nlohmann::json();
+    }
+    j["ancestors"] = ancestors_json;
+    ancestors_json = {};
+    for (const auto &[thm, ancestor]: permanent_ancestors) {
+        ancestors_json[thm] = ancestor.operator nlohmann::json();
+    }
+    j["permanent_ancestors"] = ancestors_json;
+    j["unexplored_theorems"] = nlohmann::json(unexplored_theorems);
+    j["minimum_proof_size"] = nlohmann::json(minimum_proof_size);
+    j["initial_minimum_proof_size"] = nlohmann::json(initial_minimum_proof_size);
+    j["policy"] = nlohmann::json(*policy);
+    j["params"] = nlohmann::json(params);
+    j["expansion_count"] = expansion_count;
+    std::vector<nlohmann::json> simulations_explicit;
+    for (const auto &sim: simulations) {
+        simulations_explicit.push_back((*sim).operator nlohmann::json());
+    }
+    j["simulations"] = simulations_explicit;
+    nlohmann::json simulations_for_theorem_json;
+    for (const auto &[thm, sims]: simulations_for_theorem) {
+        std::vector<nlohmann::json> sims_explicit;
+        for (const auto &sim: sims) {
+            sims_explicit.push_back((*sim).operator nlohmann::json());
+        }
+        simulations_for_theorem_json[thm] = sims_explicit;
+    }
+    j["simulations_for_theorem"] = simulations_for_theorem_json;
+    j["backedup_hashes"] = backedup_hashes;
+    j["currently_expanding"] = nlohmann::json(currently_expanding);
+    j["propagate_needed"] = propagate_needed;
+    j["done"] = done;
+    j["seed"] = htps::seed;
+    return j;
+}
+
+htps::htps_params HTPS::get_params() const {
+    return params;
+}
+
 
 proof HTPSResult::get_proof() const {
     return p;
@@ -1092,4 +1408,58 @@ std::vector<HTPSSampleEffect> HTPSResult::get_effect_samples() const {
 
 Metric HTPSResult::get_metric() const {
     return metric;
+}
+
+htps_params::operator nlohmann::json() const {
+    nlohmann::json j;
+    j["num_expansions"] = num_expansions;
+    j["succ_expansions"] = succ_expansions;
+    j["early_stopping"] = early_stopping;
+    j["no_critic"] = no_critic;
+    j["early_stopping_solved_if_root_not_proven"] = early_stopping_solved_if_root_not_proven;
+    j["backup_once"] = backup_once;
+    j["backup_one_for_solved"] = backup_one_for_solved;
+    j["exploration"] = exploration;
+    j["virtual_loss"] = virtual_loss;
+    j["policy_type"] = policy_type;
+    j["policy_temperature"] = policy_temperature;
+    j["q_value_solved"] = q_value_solved;
+    j["tactic_init_value"] = tactic_init_value;
+    j["effect_subsampling_rate"] = effect_subsampling_rate;
+    j["critic_subsampling_rate"] = critic_subsampling_rate;
+    j["tactic_p_threshold"] = tactic_p_threshold;
+    j["count_threshold"] = count_threshold;
+    j["node_mask"] = node_mask;
+    j["only_learn_best_tactics"] = only_learn_best_tactics;
+    j["tactic_sample_q_conditioning"] = tactic_sample_q_conditioning;
+    j["depth_penalty"] = depth_penalty;
+    j["metric"] = metric;
+    return j;
+}
+
+htps_params htps_params::from_json(const nlohmann::json &j) {
+    htps_params params;
+    params.exploration = j["exploration"];
+    params.num_expansions = j["num_expansions"];
+    params.succ_expansions = j["succ_expansions"];
+    params.early_stopping = j["early_stopping"];
+    params.no_critic = j["no_critic"];
+    params.early_stopping_solved_if_root_not_proven = j["early_stopping_solved_if_root_not_proven"];
+    params.backup_once = j["backup_once"];
+    params.backup_one_for_solved = j["backup_one_for_solved"];
+    params.virtual_loss = j["virtual_loss"];
+    params.policy_type = j["policy_type"];
+    params.policy_temperature = j["policy_temperature"];
+    params.q_value_solved = j["q_value_solved"];
+    params.tactic_init_value = j["tactic_init_value"];
+    params.effect_subsampling_rate = j["effect_subsampling_rate"];
+    params.critic_subsampling_rate = j["critic_subsampling_rate"];
+    params.tactic_p_threshold = j["tactic_p_threshold"];
+    params.count_threshold = j["count_threshold"];
+    params.node_mask = j["node_mask"];
+    params.only_learn_best_tactics = j["only_learn_best_tactics"];
+    params.tactic_sample_q_conditioning = j["tactic_sample_q_conditioning"];
+    params.depth_penalty = j["depth_penalty"];
+    params.metric = j["metric"];
+    return params;
 }

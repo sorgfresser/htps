@@ -12,6 +12,7 @@
 #include <memory>
 #include <set>
 #include <any>
+#include "../json.hpp"
 
 namespace htps {
     struct tactic {
@@ -21,6 +22,10 @@ namespace htps {
         std::string unique_string;
         bool is_valid;
         size_t duration; // duration in milliseconds
+
+        static tactic from_json(const nlohmann::json &j);
+
+        operator nlohmann::json() const;
 
         bool operator==(const tactic &t) const;
 
@@ -41,7 +46,9 @@ namespace htps {
         std::string identifier;
         std::string type;
 
-        static hypothesis from_json(const std::string &json);
+        static hypothesis from_json(const nlohmann::json &j);
+
+        operator nlohmann::json() const;
 
         bool operator==(const hypothesis &h) const;
     };
@@ -61,6 +68,10 @@ namespace htps {
         context(context &&) = default;
 
         explicit context(std::set<std::string> namespaces) : namespaces(std::move(namespaces)) {}
+
+        static context from_json(const nlohmann::json &j);
+
+        operator nlohmann::json() const;
     };
 
     struct theorem {
@@ -93,6 +104,10 @@ namespace htps {
         void reset_tactics();
 
         void set_tactics(std::vector<tactic> &tactics);
+
+        static theorem from_json(const nlohmann::json &j);
+
+        operator nlohmann::json() const;
 
     protected:
         /* Create a unique string for a theorem using its conclusion and hypotheses.
@@ -142,61 +157,39 @@ namespace htps {
         std::shared_ptr<theorem> proof_theorem;
         std::shared_ptr<tactic> proof_tactic;
         std::vector<proof> children;
+
+        static proof from_json(const nlohmann::json &json);
+
+        operator nlohmann::json() const;
     };
-
-//    struct proof_node {
-//        theorem *proof_theorem;
-//        tactic *proof_tactic;
-//        std::vector<theorem> children;
-
-//        static proof_node from_json(const std::string &json);
-//    };
-
-//    template<typename T>
-//    class TacticToChildrenMap {
-//    private:
-//        std::unordered_map<std::string, std::vector<T>> string_to_children;
-//    public:
-//        bool contains(const std::string &s) {
-//            return string_to_children.contains(s);
-//        }
-//    };
-//
-//    struct hyper_tree_node {
-//        std::size_t id;
-//        bool _proven;
-//        tactic *proven_by = nullptr;
-//
-//        std::vector<tactic *> tactics;
-//        std::unordered_map<tactic, std::vector<hyper_tree_node>> tactic_to_children;
-//
-//        bool is_proven() const;
-//
-//        bool operator==(const hyper_tree_node &n) const = default;
-//
-//        static hyper_tree_node from_json(const std::string &json);
-//    };
-//
-//    struct hyper_tree {
-//        std::unordered_map<theorem, hyper_tree_node> theorem_to_node;
-//        std::vector<theorem> id_to_theorem;
-//        std::vector<theorem> leaves;
-//        theorem *root;
-//        std::unordered_set<theorem> proven;
-//
-//        hyper_tree_node add_node(const theorem &t);
-//
-//        void expand_with_tactic(const theorem &src, const tactic &tactic, const std::vector<theorem> &children);
-//
-//        bool propagate_proven(const theorem &t);
-//
-//        proof get_proof();
-//
-//    protected:
-//        bool walk(hyper_tree_node &src, std::vector<hyper_tree_node> &seen, std::vector<hyper_tree_node> &seen_proven);
-//
-//        proof build_proof(size_t id);
-//    };
 }
 
+namespace nlohmann
+{
+    template <typename T>
+    struct adl_serializer<std::shared_ptr<T>>
+    {
+        static void to_json(json& j, const std::shared_ptr<T>& opt)
+        {
+            if (opt)
+            {
+                j = *opt;
+            }
+            else
+            {
+                j = nullptr;
+            }
+        }
+
+        static void from_json(const json& j, std::shared_ptr<T>& opt)
+        {
+            if (j.is_null()) {
+                opt = nullptr;
+            }
+            else {
+                opt = std::make_shared<T>(j.get<T>());
+            }
+        }
+    };
+}
 #endif // HTPS_BASE_H

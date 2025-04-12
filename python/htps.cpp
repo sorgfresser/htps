@@ -45,47 +45,42 @@ static PyObject *make_enum(PyObject *module, PyObject *enum_module, const char *
 static PyObject *make_policy_type(PyObject *module, PyObject *enum_module) {
     if (PolicyTypeEnum != NULL)
         return PolicyTypeEnum;
-    size_t value_size = 2;
-    const char *values[value_size] = {"AlphaZero", "RPO"};
-    PolicyTypeEnum = make_enum(module, enum_module, values, value_size, "PolicyType");
+    const char *values[] = {"AlphaZero", "RPO"};
+    PolicyTypeEnum = make_enum(module, enum_module, values, 2, "PolicyType");
     return PolicyTypeEnum;
 }
 
 static PyObject *make_q_value_solved(PyObject *module, PyObject *enum_module) {
     if (QValueSolvedEnum != NULL)
         return QValueSolvedEnum;
-    size_t value_size = 5;
-    const char *values[value_size] = {
+    const char *values[] = {
         "OneOverCounts", "CountOverCounts", "One", "OneOverVirtualCounts", "OneOverCountsNoFPU", "CountOverCountsNoFPU"
     };
-    QValueSolvedEnum = make_enum(module, enum_module, values, value_size, "QValueSolved");
+    QValueSolvedEnum = make_enum(module, enum_module, values, 6, "QValueSolved");
     return QValueSolvedEnum;
 }
 
 static PyObject *make_node_mask(PyObject *module, PyObject *enum_module) {
     if (NodeMaskEnum != NULL)
         return NodeMaskEnum;
-    size_t value_size = 5;
-    const char *values[value_size] = {"NoMask", "Solving", "Proof", "MinimalProof", "MinimalProofSolving"};
-    NodeMaskEnum =  make_enum(module, enum_module, values, value_size, "NodeMask");
+    const char *values[5] = {"NoMask", "Solving", "Proof", "MinimalProof", "MinimalProofSolving"};
+    NodeMaskEnum =  make_enum(module, enum_module, values, 5, "NodeMask");
     return NodeMaskEnum;
 }
 
 static PyObject *make_metric(PyObject *module, PyObject *enum_module) {
     if (MetricEnum != NULL)
         return MetricEnum;
-    size_t value_size = 3;
-    const char *values[value_size] = {"Depth", "Size", "Time"};
-    MetricEnum = make_enum(module, enum_module, values, value_size, "Metric");
+    const char *values[3] = {"Depth", "Size", "Time"};
+    MetricEnum = make_enum(module, enum_module, values, 3, "Metric");
     return MetricEnum;
 }
 
 static PyObject *make_in_proof(PyObject *module, PyObject *enum_module) {
     if (InProofEnum != NULL)
         return InProofEnum;
-    size_t value_size = 3;
-    const char *values[value_size] = {"NotInProof", "InProof", "InMinimalProof"};
-    InProofEnum = make_enum(module, enum_module, values, value_size, "InProof");
+    const char *values[3] = {"NotInProof", "InProof", "InMinimalProof"};
+    InProofEnum = make_enum(module, enum_module, values, 3, "InProof");
     return InProofEnum;
 }
 
@@ -1847,7 +1842,12 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
                 PyErr_SetString(PyExc_ValueError, "priors must sum to 1");
                 return -1;
             }
-
+            std::vector<size_t> sizes = {env_durations.size(), effects.size(), tactics.size(), children_for_tactic.size()};
+            bool are_same = std::all_of(sizes.begin(), sizes.end(), [priors](size_t value) {return priors.size() == value;});
+            if (!are_same) {
+                PyErr_SetString(PyExc_ValueError, "Priors, tactics, Durations, Effects and Children for Tactic must be of the same size!");
+                return -1;
+            }
 
             new (&(((PyEnvExpansion *)self)->expansion)) htps::env_expansion(
                 shared_thm, expander_duration, generation_duration, env_durations,
@@ -1912,6 +1912,23 @@ static int EnvExpansion_init(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 }
 
+static PyObject* EnvExpansion_get_jsonstr(PyObject *self, PyObject *args) {
+    auto *obj = (PyEnvExpansion *)self;
+    nlohmann::json j = obj->expansion.operator nlohmann::json();
+    return PyObject_from_string(j.dump());
+}
+
+static PyObject* EnvExpansion_from_jsonstr(PyTypeObject *type, PyObject *args) {
+    const char *json_str;
+    if (!PyArg_ParseTuple(args, "s", &json_str)) {
+        return NULL;
+    }
+    nlohmann::json j = nlohmann::json::parse(json_str);
+    auto *self = (PyEnvExpansion *)EnvExpansion_new(type, NULL, NULL);
+    self->expansion = htps::env_expansion::from_json(j);
+    return (PyObject *)self;
+}
+
 static PyGetSetDef EnvExpansion_getsetters[] = {
     {"thm", (getter)EnvExpansion_get_thm, (setter)EnvExpansion_set_thm, "Theorem for expansion", NULL},
     {"expander_duration", (getter)EnvExpansion_get_expander_duration, (setter)EnvExpansion_set_expander_duration, "Expander duration", NULL},
@@ -1925,6 +1942,12 @@ static PyGetSetDef EnvExpansion_getsetters[] = {
     {"error", (getter)EnvExpansion_get_error, (setter)EnvExpansion_set_error, "Error string (optional)", NULL},
     {"is_error", (getter)EnvExpansion_get_is_error, NULL, "Returns True if error is set", NULL},
     {NULL}
+};
+
+static PyMethodDef EnvExpansion_methods[] = {
+    {"get_json_str", (PyCFunction)EnvExpansion_get_jsonstr, METH_NOARGS, "Get JSON string representation"},
+    {"from_json_str", (PyCFunction)EnvExpansion_from_jsonstr, METH_VARARGS | METH_CLASS, "Create from JSON string"},
+    {NULL, NULL, 0, NULL}
 };
 
 
@@ -1955,7 +1978,7 @@ NULL,
 NULL,
 NULL,
 NULL,
-NULL,
+EnvExpansion_methods,
 NULL,
 EnvExpansion_getsetters,
 NULL,
@@ -3166,6 +3189,37 @@ static PyObject* PyHTPS_get_result(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
     return PyHTPSResult_NewFromResult(result);
 }
 
+static PyObject* PyHTPS_get_jsonstr(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    std::string result;
+    try {
+        result = nlohmann::json(self->graph).dump();
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+    return PyObject_from_string(result);
+}
+
+static PyObject* PyHTPS_from_jsonstr(PyTypeObject *type, PyObject *args) {
+    const char *json_str;
+    if (!PyArg_ParseTuple(args, "s", &json_str)) {
+        PyErr_SetString(PyExc_TypeError, "from_jsonstr expects a string");
+        return NULL;
+    }
+    try {
+        auto json = nlohmann::json::parse(json_str);
+        auto graph = htps::HTPS::from_json(json);
+        PyObject *obj = HTPS_new(type, NULL, NULL);
+        if (obj == NULL)
+            return NULL;
+        auto *py_graph = (PyHTPS *) obj;
+        py_graph->graph = graph;
+        return obj;
+    } catch (std::exception &e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return NULL;
+    }
+}
 
 static PyMethodDef HTPS_methods[] = {
     {"theorems_to_expand", (PyCFunction)PyHTPS_theorems_to_expand, METH_NOARGS, "Returns a list of subsequent theorems to expand"},
@@ -3173,6 +3227,8 @@ static PyMethodDef HTPS_methods[] = {
     {"proven", (PyCFunction)PyHTPS_is_proven, METH_NOARGS, "Whether the start theorem is proven or not"},
     {"get_result", (PyCFunction)PyHTPS_get_result, METH_NOARGS, "Returns the result of the HTPS run"},
     {"is_done", (PyCFunction)PyHTPS_is_done, METH_NOARGS, "Whether the HTPS run is done or not"},
+    {"get_json_str", (PyCFunction)PyHTPS_get_jsonstr, METH_NOARGS, "Returns a JSON string representation of the HTPS object"},
+    {"from_json_str", (PyCFunction)PyHTPS_from_jsonstr, METH_VARARGS | METH_CLASS, "Creates a HTPS object from a JSON string"},
     {NULL, NULL, 0, NULL}
 };
 

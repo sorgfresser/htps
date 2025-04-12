@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <stdexcept>
+#include <fstream>
 #include "../src/graph/htps.h"
 
 using namespace htps;
@@ -75,6 +76,7 @@ protected:
 
         // Construct HTPS using the root.
         htps_instance = std::make_unique<htps::HTPS>(root, dummyParams, dummyPolicy);
+        htps::seed = 42;
     }
 };
 
@@ -549,10 +551,33 @@ TEST_F(HTPSTest, TestCountThreshold) {
 }
 
 
+nlohmann::json load_json_from_file(const std::string &filename) {
+    std::ifstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+    nlohmann::json j = nlohmann::json::parse(file);
+    return j;
+}
+
+void dump_json_to_file(const nlohmann::json &j, const std::string &filename) {
+    std::ofstream file(filename);
+    if (!file) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    // Dump JSON object to the file with an indent of 4 spaces.
+    file << j.dump(4);
+
+    if (!file.good()) {
+        throw std::runtime_error("Error writing to file: " + filename);
+    }
+}
+
+
 TEST_F(HTPSTest, TestInfiniteLoop) {
     auto params = dummyParams;
     htps_instance->set_params(dummyParams);
-
     EXPECT_FALSE(htps_instance->is_proven());
 
     htps_instance->theorems_to_expand();
@@ -614,4 +639,43 @@ TEST_F(HTPSTest, TestInfiniteLoop) {
     EXPECT_TRUE(samples_effect.size() == 3);
     // No proof samples though, as there is no proof
     EXPECT_TRUE(proof_samples_tactics.empty());
+
+    auto json = nlohmann::json(*htps_instance);
+    dump_json_to_file(json, "samples/test2.json");
+
+    auto json2 = nlohmann::json(expansion);
+    dump_json_to_file(json2, "samples/test3.json");
+}
+
+
+
+TEST_F(HTPSTest, TestJsonLoading) {
+    auto j = load_json_from_file("samples/test.json");
+
+    HTPS search = htps::HTPS::from_json(j);
+    EXPECT_FALSE(search.is_done());
+    // Because we are awaiting expansions
+    EXPECT_THROW(search.theorems_to_expand(), std::runtime_error);
+}
+
+
+
+TEST_F(HTPSTest, TestJsonExpectations) {
+    auto params = dummyParams;
+    htps_instance->set_params(dummyParams);
+
+    auto j = load_json_from_file("samples/search.json");
+
+    HTPS search = htps::HTPS::from_json(j);
+    EXPECT_FALSE(search.is_done());
+
+    for (size_t index = 0; index < 3; index++) {
+        j = load_json_from_file("samples/expansions_" + std::to_string(index) + ".json");
+        std::vector<std::shared_ptr<htps::env_expansion>> expansions;
+        for (auto &expansion: j) {
+            expansions.push_back(std::make_shared<htps::env_expansion>(htps::env_expansion::from_json(expansion)));
+        }
+        auto theorems = search.theorems_to_expand();
+        search.expand_and_backup(expansions);
+    }
 }

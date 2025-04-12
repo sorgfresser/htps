@@ -48,7 +48,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          apt install -y gcc-c++ make cmake google-test google-test-devel
+          sudo apt install -y gcc-c++ make cmake google-test google-test-devel
 
       - name: Configure project
         run: |

@@ -550,7 +550,9 @@ void HTPSNode::get_tactics_sample_regular(Metric metric, NodeMask node_mask,
         // If the node is solved, take the uniform distribution over all solving tactics
     else {
         valid_targets.resize(selected_tactic_ids.size());
-        std::fill(valid_targets.begin(), valid_targets.begin(), 1.0 / static_cast<double>(tactics.size()));
+        std::fill(valid_targets.begin(), valid_targets.end(), 1.0 / static_cast<double>(selected_tactic_ids.size()));
+        double sum = std::accumulate(valid_targets.begin(), valid_targets.end(), 0.0);
+        assert (0.99 < sum < 1.01);
     }
     assert(selected_tactic_ids.size() == valid_targets.size());
     assert(selected_tactic_ids.size() == valid_tactics.size());

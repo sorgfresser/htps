@@ -623,6 +623,8 @@ namespace htps {
         explicit operator nlohmann::json() const;
 
         htps::htps_params get_params() const;
+
+        size_t num_expansions() const;
     };
 
 }

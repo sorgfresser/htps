@@ -3169,6 +3169,10 @@ static PyObject *PyHTPS_is_done(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
     return res;
 }
 
+static PyObject *PyHTPS_expansions(PyHTPS *self, void *closure) {
+    return PyLong_FromSize_t(self->graph.num_expansions());
+}
+
 static void PyHTPS_dealloc(PyHTPS *self) {
     self->graph.~HTPS();
     Py_TYPE(self)->tp_free((PyObject *) self);
@@ -3217,6 +3221,11 @@ static PyObject *PyHTPS_from_jsonstr(PyTypeObject *type, PyObject *args) {
     }
 }
 
+static PyGetSetDef HTPS_getsetters[] = {
+        {"expansions", (getter) PyHTPS_expansions, NULL, "Number of expansions", NULL},
+        {NULL}
+};
+
 static PyMethodDef HTPS_methods[] = {
         {"theorems_to_expand", (PyCFunction) PyHTPS_theorems_to_expand, METH_NOARGS,  "Returns a list of subsequent theorems to expand"},
         {"expand_and_backup",  (PyCFunction) PyHTPS_expand_and_backup,  METH_VARARGS, "Expands and backups using the provided list of EnvExpansion objects"},
@@ -3258,7 +3267,7 @@ static PyTypeObject HTPSType = {
         NULL,
         HTPS_methods,
         NULL,
-        NULL,
+        HTPS_getsetters,
         NULL,
         NULL,
         NULL,

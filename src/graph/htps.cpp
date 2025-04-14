@@ -1425,6 +1425,10 @@ void HTPS::set_params(const htps_params &new_params) {
     policy = std::make_shared<Policy>(params.policy_type, params.exploration);
 }
 
+size_t HTPS::num_expansions() const {
+    return expansion_count;
+}
+
 HTPS HTPS::from_json(const nlohmann::json &j) {
     HTPS htps;
     htps.root = j["root"];

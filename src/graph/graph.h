@@ -918,7 +918,7 @@ namespace htps {
                 if constexpr (has_static_from_json<T>::value) {
                     map.insert(key, (T::from_json(value)));
                 } else {
-                    map.insert(key, (value.get<T>()));
+                    map.insert(key, (value.template get<T>()));
                 }
 
             }

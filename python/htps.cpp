@@ -3221,6 +3221,12 @@ static PyObject *PyHTPS_from_jsonstr(PyTypeObject *type, PyObject *args) {
     }
 }
 
+static PyObject *PyHTPS_is_expanding(PyHTPS *self, PyObject *Py_UNUSED(ignored)) {
+    PyObject *res = self->graph.is_expanding() ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
+}
+
 static PyGetSetDef HTPS_getsetters[] = {
         {"expansions", (getter) PyHTPS_expansions, NULL, "Number of expansions", NULL},
         {NULL}
@@ -3232,6 +3238,7 @@ static PyMethodDef HTPS_methods[] = {
         {"proven",             (PyCFunction) PyHTPS_is_proven,          METH_NOARGS,  "Whether the start theorem is proven or not"},
         {"get_result",         (PyCFunction) PyHTPS_get_result,         METH_NOARGS,  "Returns the result of the HTPS run"},
         {"is_done",            (PyCFunction) PyHTPS_is_done,            METH_NOARGS,  "Whether the HTPS run is done or not"},
+        {"is_expanding",       (PyCFunction) PyHTPS_is_expanding,       METH_NOARGS,  "Whether the HTPS run is still awaiting EnvExpansions or not (in which case new theorems can be requested)"},
         {"get_json_str",       (PyCFunction) PyHTPS_get_jsonstr,        METH_NOARGS,  "Returns a JSON string representation of the HTPS object"},
         {"from_json_str",      (PyCFunction) PyHTPS_from_jsonstr,       METH_VARARGS |
                                                                         METH_CLASS, "Creates a HTPS object from a JSON string"},

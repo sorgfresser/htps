@@ -1374,8 +1374,12 @@ void HTPS::expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expans
 //        HTPS_move();
 }
 
+bool HTPS::is_expanding() const {
+    return !currently_expanding.empty();
+}
+
 void HTPS::theorems_to_expand(std::vector<TheoremPointer> &theorems) {
-    if (!currently_expanding.empty()) {
+    if (is_expanding()) {
         throw std::runtime_error("Currently expanding is not empty, give results first!");
     }
     return batch_to_expand(theorems);

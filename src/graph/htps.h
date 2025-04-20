@@ -608,6 +608,8 @@ namespace htps {
 
         bool is_done() const;
 
+        bool is_expanding() const;
+
         Simulation find_leaves_to_expand(std::vector<TheoremPointer> &terminal, std::vector<std::pair<TheoremPointer, size_t>> &to_expand);
 
         void expand_and_backup(std::vector<std::shared_ptr<env_expansion>> &expansions);

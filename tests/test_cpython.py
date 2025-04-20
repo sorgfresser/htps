@@ -419,6 +419,7 @@ def test_htps_expansion():
     # Will find the root
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1
+    assert search.is_expanding()
     _compare_theorem(theorems[0], theorem)
     assert theorems[0].metadata == {"key": "value"}
 
@@ -434,6 +435,7 @@ def test_htps_expansion():
     effects = [effect1, effect2]
     expansion = EnvExpansion(theorems[0], 100, 200, env_durations, effects, log_critic, expansion_tactics, children_for_tactic, priors)
     search.expand_and_backup([expansion])
+    assert not search.is_expanding()
 
     theorems = search.theorems_to_expand()
     assert len(theorems) == 1

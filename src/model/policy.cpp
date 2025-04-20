@@ -50,6 +50,7 @@ void Policy::get_policy(const std::vector<double> &q_values, const std::vector<d
             }
             catch (std::runtime_error &e) {
                 result.clear();
+                result.insert(result.begin(), q_values.size(), 0);
                 alpha_zero(q_values, pi_values, counts, result);
             }
 

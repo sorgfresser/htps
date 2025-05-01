@@ -16,8 +16,6 @@ FetchContent_MakeAvailable(googletest)
 find_package(Python COMPONENTS Interpreter Compiler Development)
 
 
-add_executable(htps src/main.cpp src/graph/base.cpp src/graph/graph.cpp src/graph/htps.cpp src/model/policy.cpp)
-target_include_directories(htps PRIVATE external/glob/single_include)
 add_executable(pythonhtps python/htps.cpp src/graph/htps.cpp src/model/policy.cpp src/graph/base.cpp src/graph/graph.cpp)
 target_include_directories(pythonhtps PRIVATE external/glob/single_include)
 
